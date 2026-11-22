@@ -1,0 +1,22 @@
+node_modules/
+coverage/
+dist/
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+agent_config.yaml
+.band-workspaces/
+
+# Raw live evidence (real BAND IDs); publish docs/phase4.1-band.redacted.json only.
+docs/phase4.1-band.json
+# Screenshots may contain credentials.
+screenshots/
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+*.bmp

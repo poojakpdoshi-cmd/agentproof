@@ -1,0 +1,30 @@
+{
+  "name": "agentproof",
+  "version": "0.0.0",
+  "description": "Default-deny agent permission simulator and audited MCP stdio proxy with a Red/Blue agent lab",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "start": "node src/cli.ts",
+    "proxy": "node src/mcp-proxy.ts",
+    "test": "node --test test/*.test.ts",
+    "benchmark": "node benchmarks/security.ts",
+    "benchmark:stdio": "node benchmarks/stdio.ts",
+    "agents:live": "node --env-file-if-exists=.env agents/band.ts",
+    "agents:offline": "node agents/offline.ts",
+    "demo:e2e": "node agents/e2e.ts"
+  },
+  "devDependencies": {
+    "@microsoft/agent-governance-sdk": "5.0.0",
+    "@modelcontextprotocol/client": "2.4.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@modelcontextprotocol/server": "2.4.0"
+  },
+  "dependencies": {
+    "@band-ai/sdk": "1.0.0"
+  }
+}

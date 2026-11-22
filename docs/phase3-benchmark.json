@@ -1,0 +1,497 @@
+{
+  "measuredOn": "2026-11-22",
+  "node": "v24.19.0",
+  "os": "win32 10.0.26300",
+  "cpu": "AMD Ryzen 7 7735HS with Radeon Graphics        ",
+  "microsoftPackage": "@microsoft/agent-governance-sdk@5.0.0",
+  "scope": "In-process PolicyEngine.evaluate exact-resource profile; not full toolkit or MCP transport comparison",
+  "caveat": "Raw rule conditions are not an argument validator. Adapter shares AgentProof primitives; equal outcomes are expected, not independent security validation.",
+  "methodology": {
+    "warmupPerEngine": 5000,
+    "rounds": 7,
+    "decisionsPerRound": 10000,
+    "transportAndAuditIncluded": false
+  },
+  "scores": {
+    "agentproof": {
+      "correct": 27,
+      "total": 27,
+      "falseAllows": 0,
+      "falseDenials": 0
+    },
+    "microsoftRawExactRules": {
+      "correct": 21,
+      "total": 27,
+      "falseAllows": 4,
+      "falseDenials": 2
+    },
+    "microsoftWithContractAdapter": {
+      "correct": 27,
+      "total": 27,
+      "falseAllows": 0,
+      "falseDenials": 0
+    }
+  },
+  "timing": {
+    "agentproof": {
+      "medianMicrosecondsPerDecision": 1.2410799999999995,
+      "min": 0.9777399999999999,
+      "max": 1.60642,
+      "samples": [
+        1.60642,
+        1.2410799999999995,
+        1.5644599999999969,
+        1.5702499999999986,
+        0.9777399999999999,
+        1.1498999999999968,
+        1.0029299999999977
+      ]
+    },
+    "microsoftRawExactRules": {
+      "medianMicrosecondsPerDecision": 0.21193000000000098,
+      "min": 0.16399999999999865,
+      "max": 0.42626999999999954,
+      "samples": [
+        0.42626999999999954,
+        0.22776000000000068,
+        0.21193000000000098,
+        0.3211500000000001,
+        0.17624999999999885,
+        0.17293999999999982,
+        0.16399999999999865
+      ]
+    },
+    "microsoftWithContractAdapter": {
+      "medianMicrosecondsPerDecision": 1.3401700000000005,
+      "min": 1.122180000000003,
+      "max": 1.8379999999999996,
+      "samples": [
+        1.7726500000000014,
+        1.3401700000000005,
+        1.1778500000000007,
+        1.8379999999999996,
+        1.5065599999999961,
+        1.122180000000003,
+        1.3280100000000004
+      ]
+    }
+  },
+  "checksum": 55626,
+  "results": [
+    {
+      "name": "allowed read",
+      "params": {
+        "name": "read_file",
+        "arguments": {
+          "path": "docs/dummy.txt"
+        }
+      },
+      "expected": true,
+      "decisions": {
+        "agentproof": true,
+        "microsoftRawExactRules": true,
+        "microsoftWithContractAdapter": true
+      }
+    },
+    {
+      "name": "allowed write",
+      "params": {
+        "name": "write_file",
+        "arguments": {
+          "path": "out/dummy.txt",
+          "data": "DUMMY"
+        }
+      },
+      "expected": true,
+      "decisions": {
+        "agentproof": true,
+        "microsoftRawExactRules": true,
+        "microsoftWithContractAdapter": true
+      }
+    },
+    {
+      "name": "allowed GET",
+      "params": {
+        "name": "network_request",
+        "arguments": {
+          "url": "https://api.example.test/health"
+        }
+      },
+      "expected": true,
+      "decisions": {
+        "agentproof": true,
+        "microsoftRawExactRules": true,
+        "microsoftWithContractAdapter": true
+      }
+    },
+    {
+      "name": "allowed HEAD",
+      "params": {
+        "name": "network_request",
+        "arguments": {
+          "url": "https://api.example.test/health",
+          "method": "HEAD"
+        }
+      },
+      "expected": true,
+      "decisions": {
+        "agentproof": true,
+        "microsoftRawExactRules": true,
+        "microsoftWithContractAdapter": true
+      }
+    },
+    {
+      "name": "Windows slash alias",
+      "params": {
+        "name": "read_file",
+        "arguments": {
+          "path": "docs\\dummy.txt"
+        }
+      },
+      "expected": true,
+      "decisions": {
+        "agentproof": true,
+        "microsoftRawExactRules": false,
+        "microsoftWithContractAdapter": true
+      }
+    },
+    {
+      "name": "Windows case alias",
+      "params": {
+        "name": "read_file",
+        "arguments": {
+          "path": "DOCS/DUMMY.TXT"
+        }
+      },
+      "expected": true,
+      "decisions": {
+        "agentproof": true,
+        "microsoftRawExactRules": false,
+        "microsoftWithContractAdapter": true
+      }
+    },
+    {
+      "name": "unauthorized read",
+      "params": {
+        "name": "read_file",
+        "arguments": {
+          "path": "private/dummy.txt"
+        }
+      },
+      "expected": false,
+      "decisions": {
+        "agentproof": false,
+        "microsoftRawExactRules": false,
+        "microsoftWithContractAdapter": false
+      }
+    },
+    {
+      "name": "unauthorized write",
+      "params": {
+        "name": "write_file",
+        "arguments": {
+          "path": "docs/dummy.txt",
+          "data": "DUMMY"
+        }
+      },
+      "expected": false,
+      "decisions": {
+        "agentproof": false,
+        "microsoftRawExactRules": false,
+        "microsoftWithContractAdapter": false
+      }
+    },
+    {
+      "name": "traversal",
+      "params": {
+        "name": "read_file",
+        "arguments": {
+          "path": "docs/../private/dummy.txt"
+        }
+      },
+      "expected": false,
+      "decisions": {
+        "agentproof": false,
+        "microsoftRawExactRules": false,
+        "microsoftWithContractAdapter": false
+      }
+    },
+    {
+      "name": "mixed traversal",
+      "params": {
+        "name": "read_file",
+        "arguments": {
+          "path": "docs/..\\private/dummy.txt"
+        }
+      },
+      "expected": false,
+      "decisions": {
+        "agentproof": false,
+        "microsoftRawExactRules": false,
+        "microsoftWithContractAdapter": false
+      }
+    },
+    {
+      "name": "UNC",
+      "params": {
+        "name": "read_file",
+        "arguments": {
+          "path": "\\\\server\\share\\dummy.txt"
+        }
+      },
+      "expected": false,
+      "decisions": {
+        "agentproof": false,
+        "microsoftRawExactRules": false,
+        "microsoftWithContractAdapter": false
+      }
+    },
+    {
+      "name": "device UNC",
+      "params": {
+        "name": "read_file",
+        "arguments": {
+          "path": "\\\\?\\UNC\\server\\share\\dummy.txt"
+        }
+      },
+      "expected": false,
+      "decisions": {
+        "agentproof": false,
+        "microsoftRawExactRules": false,
+        "microsoftWithContractAdapter": false
+      }
+    },
+    {
+      "name": "drive relative",
+      "params": {
+        "name": "read_file",
+        "arguments": {
+          "path": "C:dummy.txt"
+        }
+      },
+      "expected": false,
+      "decisions": {
+        "agentproof": false,
+        "microsoftRawExactRules": false,
+        "microsoftWithContractAdapter": false
+      }
+    },
+    {
+      "name": "absolute",
+      "params": {
+        "name": "read_file",
+        "arguments": {
+          "path": "/docs/dummy.txt"
+        }
+      },
+      "expected": false,
+      "decisions": {
+        "agentproof": false,
+        "microsoftRawExactRules": false,
+        "microsoftWithContractAdapter": false
+      }
+    },
+    {
+      "name": "ADS",
+      "params": {
+        "name": "read_file",
+        "arguments": {
+          "path": "docs/dummy.txt:stream"
+        }
+      },
+      "expected": false,
+      "decisions": {
+        "agentproof": false,
+        "microsoftRawExactRules": false,
+        "microsoftWithContractAdapter": false
+      }
+    },
+    {
+      "name": "reserved name",
+      "params": {
+        "name": "read_file",
+        "arguments": {
+          "path": "docs/NUL.txt"
+        }
+      },
+      "expected": false,
+      "decisions": {
+        "agentproof": false,
+        "microsoftRawExactRules": false,
+        "microsoftWithContractAdapter": false
+      }
+    },
+    {
+      "name": "trailing dot",
+      "params": {
+        "name": "read_file",
+        "arguments": {
+          "path": "docs/dummy.txt."
+        }
+      },
+      "expected": false,
+      "decisions": {
+        "agentproof": false,
+        "microsoftRawExactRules": false,
+        "microsoftWithContractAdapter": false
+      }
+    },
+    {
+      "name": "encoded traversal",
+      "params": {
+        "name": "read_file",
+        "arguments": {
+          "path": "docs/%2e%2e/dummy.txt"
+        }
+      },
+      "expected": false,
+      "decisions": {
+        "agentproof": false,
+        "microsoftRawExactRules": false,
+        "microsoftWithContractAdapter": false
+      }
+    },
+    {
+      "name": "different origin",
+      "params": {
+        "name": "network_request",
+        "arguments": {
+          "url": "https://evil.example.test/health"
+        }
+      },
+      "expected": false,
+      "decisions": {
+        "agentproof": false,
+        "microsoftRawExactRules": false,
+        "microsoftWithContractAdapter": false
+      }
+    },
+    {
+      "name": "body exfiltration",
+      "params": {
+        "name": "network_request",
+        "arguments": {
+          "url": "https://api.example.test/health",
+          "body": "DUMMY_SECRET"
+        }
+      },
+      "expected": false,
+      "decisions": {
+        "agentproof": false,
+        "microsoftRawExactRules": true,
+        "microsoftWithContractAdapter": false
+      }
+    },
+    {
+      "name": "header exfiltration",
+      "params": {
+        "name": "network_request",
+        "arguments": {
+          "url": "https://api.example.test/health",
+          "headers": {
+            "X-Dummy": "DUMMY_SECRET"
+          }
+        }
+      },
+      "expected": false,
+      "decisions": {
+        "agentproof": false,
+        "microsoftRawExactRules": true,
+        "microsoftWithContractAdapter": false
+      }
+    },
+    {
+      "name": "query exfiltration",
+      "params": {
+        "name": "network_request",
+        "arguments": {
+          "url": "https://api.example.test/health?secret=DUMMY"
+        }
+      },
+      "expected": false,
+      "decisions": {
+        "agentproof": false,
+        "microsoftRawExactRules": false,
+        "microsoftWithContractAdapter": false
+      }
+    },
+    {
+      "name": "URL credentials",
+      "params": {
+        "name": "network_request",
+        "arguments": {
+          "url": "https://DUMMY@api.example.test/health"
+        }
+      },
+      "expected": false,
+      "decisions": {
+        "agentproof": false,
+        "microsoftRawExactRules": false,
+        "microsoftWithContractAdapter": false
+      }
+    },
+    {
+      "name": "POST forbidden",
+      "params": {
+        "name": "network_request",
+        "arguments": {
+          "url": "https://api.example.test/health",
+          "method": "POST"
+        }
+      },
+      "expected": false,
+      "decisions": {
+        "agentproof": false,
+        "microsoftRawExactRules": false,
+        "microsoftWithContractAdapter": false
+      }
+    },
+    {
+      "name": "extra file argument",
+      "params": {
+        "name": "read_file",
+        "arguments": {
+          "path": "docs/dummy.txt",
+          "followSymlinks": true
+        }
+      },
+      "expected": false,
+      "decisions": {
+        "agentproof": false,
+        "microsoftRawExactRules": true,
+        "microsoftWithContractAdapter": false
+      }
+    },
+    {
+      "name": "non-string write",
+      "params": {
+        "name": "write_file",
+        "arguments": {
+          "path": "out/dummy.txt",
+          "data": 42
+        }
+      },
+      "expected": false,
+      "decisions": {
+        "agentproof": false,
+        "microsoftRawExactRules": true,
+        "microsoftWithContractAdapter": false
+      }
+    },
+    {
+      "name": "unknown tool",
+      "params": {
+        "name": "shell",
+        "arguments": {
+          "command": "DUMMY"
+        }
+      },
+      "expected": false,
+      "decisions": {
+        "agentproof": false,
+        "microsoftRawExactRules": false,
+        "microsoftWithContractAdapter": false
+      }
+    }
+  ]
+}

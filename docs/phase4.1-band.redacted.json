@@ -1,0 +1,23 @@
+{
+  "liveBandVerified": true,
+  "autonomousAI": false,
+  "sdk": "@band-ai/sdk@1.0.0",
+  "roomId": "<private-room-id> sha256:04b45d3f28d8",
+  "events": [
+    {
+      "role": "BLUE",
+      "receivedMessageId": "<message-id> sha256:d0f589b40069",
+      "senderId": "<red-agent-id> sha256:c00590d62a7d",
+      "roomId": "<private-room-id> sha256:04b45d3f28d8",
+      "at": "2026-11-22T06:16:56.285Z"
+    },
+    {
+      "role": "RED",
+      "receivedMessageId": "<message-id> sha256:6b90d82d44aa",
+      "senderId": "<blue-agent-id> sha256:b16f39ea2b0a",
+      "roomId": "<private-room-id> sha256:04b45d3f28d8",
+      "at": "2026-11-22T06:16:57.715Z"
+    }
+  ],
+  "redaction": "BAND platform IDs replaced by labels + truncated SHA-256 fingerprints; operator can match privately against the untracked raw file. No credentials were ever present."
+}

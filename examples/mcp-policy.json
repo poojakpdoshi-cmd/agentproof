@@ -1,0 +1,5 @@
+{
+  "read": ["docs/", "out/"],
+  "write": ["out/"],
+  "network": ["https://api.example.test/health"]
+}

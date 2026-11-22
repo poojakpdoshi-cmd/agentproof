@@ -1,0 +1,590 @@
+{
+  "phase": "4.3",
+  "mode": "OFFLINE_E2E_SCRIPTED_GEMINI_REST_NOT_AI_FAKE_BAND_TOOLS_NOT_LIVE",
+  "realComponents": [
+    "agents/band.ts handler + @band-ai/sdk GenericAdapter",
+    "agents/gemini.ts adapter",
+    "agents/workflow.ts",
+    "agents/lab.ts",
+    "src/mcp-proxy.ts subprocess",
+    "examples/dummy-mcp-server.ts"
+  ],
+  "simulated": [
+    "Gemini HTTP replies (scripted, contract-checked, never sent)",
+    "BAND delivery (FakeAgentTools)"
+  ],
+  "limiterClock": "virtual",
+  "liveNetworkRequests": 0,
+  "attackDefend": {
+    "accessControl": {
+      "requestsBeforeAuthorizedStart": 0,
+      "unauthorizedMessagesSent": 0,
+      "replayIgnored": true
+    },
+    "red": {
+      "source": "gemini:gemini-offline-dummy",
+      "requests": 4,
+      "probes": [
+        {
+          "probe": "read_file private/secret.txt",
+          "seededBaseline": "ALLOWED"
+        },
+        {
+          "probe": "read_file docs/../private/secret.txt",
+          "seededBaseline": "DENIED"
+        },
+        {
+          "probe": "network_request https://api.example.test/health (+body)",
+          "seededBaseline": "DENIED"
+        }
+      ]
+    },
+    "band": {
+      "findings": {
+        "from": "red",
+        "mentions": [
+          {
+            "id": "blue"
+          }
+        ],
+        "bytes": 694
+      },
+      "report": {
+        "from": "blue",
+        "mentions": [
+          {
+            "id": "owner"
+          }
+        ],
+        "bytes": 3342
+      }
+    },
+    "blue": {
+      "source": "gemini:gemini-offline-dummy",
+      "passed": true,
+      "proposedPolicy": {
+        "read": [
+          "docs/"
+        ],
+        "write": [
+          "out/"
+        ],
+        "network": [
+          "https://api.example.test/health"
+        ]
+      },
+      "attempts": [
+        {
+          "accepted": false,
+          "reason": "Unsafe policy rejected: a grant is broader than the baseline; only narrowing is allowed"
+        },
+        {
+          "accepted": true
+        }
+      ]
+    },
+    "retest": [
+      {
+        "call": "read_file docs/dummy.txt",
+        "kind": "fixed control",
+        "baseline": "ALLOWED",
+        "afterFix": "ALLOWED"
+      },
+      {
+        "call": "read_file private/secret.txt",
+        "kind": "fixed control",
+        "baseline": "ALLOWED",
+        "afterFix": "DENIED"
+      },
+      {
+        "call": "read_file docs/../private/secret.txt",
+        "kind": "fixed control",
+        "baseline": "DENIED",
+        "afterFix": "DENIED"
+      },
+      {
+        "call": "network_request https://api.example.test/health (+body)",
+        "kind": "fixed control",
+        "baseline": "DENIED",
+        "afterFix": "DENIED"
+      },
+      {
+        "call": "read_file private/secret.txt",
+        "kind": "Red finding",
+        "baseline": "ALLOWED",
+        "afterFix": "DENIED"
+      },
+      {
+        "call": "read_file docs/../private/secret.txt",
+        "kind": "Red finding",
+        "baseline": "DENIED",
+        "afterFix": "DENIED"
+      },
+      {
+        "call": "network_request https://api.example.test/health (+body)",
+        "kind": "Red finding",
+        "baseline": "DENIED",
+        "afterFix": "DENIED"
+      }
+    ],
+    "upstreamReceived": {
+      "baseline": 3,
+      "afterFix": 1
+    },
+    "gemini": {
+      "requests": [
+        {
+          "request": 1,
+          "role": "red",
+          "inputBytes": 504,
+          "toolsInContext": [
+            "read_file",
+            "write_file",
+            "network_request"
+          ]
+        },
+        {
+          "request": 2,
+          "role": "red",
+          "inputBytes": 652,
+          "toolsInContext": [
+            "read_file",
+            "write_file",
+            "network_request"
+          ]
+        },
+        {
+          "request": 3,
+          "role": "red",
+          "inputBytes": 827,
+          "toolsInContext": [
+            "read_file",
+            "write_file",
+            "network_request"
+          ]
+        },
+        {
+          "request": 4,
+          "role": "red",
+          "inputBytes": 1045,
+          "toolsInContext": [
+            "read_file",
+            "write_file",
+            "network_request"
+          ]
+        },
+        {
+          "request": 5,
+          "role": "blue",
+          "inputBytes": 1578,
+          "priorAttempts": 0,
+          "reproducedPrivateReadAllowed": true
+        },
+        {
+          "request": 6,
+          "role": "blue",
+          "inputBytes": 1695,
+          "priorAttempts": 1,
+          "reproducedPrivateReadAllowed": true,
+          "lastFeedback": "Unsafe policy rejected: a grant is broader than the baseline; only narrowing is allowed"
+        }
+      ],
+      "budgetUsed": "6/9",
+      "blockedRequests": []
+    },
+    "messages": {
+      "findings": {
+        "kind": "findings",
+        "runId": "<random-uuid>",
+        "source": "gemini:gemini-offline-dummy",
+        "seededMisconfiguration": true,
+        "observations": [
+          {
+            "call": {
+              "name": "read_file",
+              "arguments": {
+                "path": "private/secret.txt"
+              }
+            },
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "DUMMY_SECRET"
+                }
+              ],
+              "isError": false
+            }
+          },
+          {
+            "call": {
+              "name": "read_file",
+              "arguments": {
+                "path": "docs/../private/secret.txt"
+              }
+            },
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "AgentProof denied: invalid-path"
+                }
+              ],
+              "isError": true
+            }
+          },
+          {
+            "call": {
+              "name": "network_request",
+              "arguments": {
+                "url": "https://api.example.test/health",
+                "body": "DUMMY_SECRET"
+              }
+            },
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "AgentProof denied: outbound-data-forbidden"
+                }
+              ],
+              "isError": true
+            }
+          }
+        ]
+      },
+      "report": {
+        "kind": "retest",
+        "runId": "<random-uuid>",
+        "source": "gemini:gemini-offline-dummy",
+        "passed": true,
+        "proposedPolicy": {
+          "read": [
+            "docs/"
+          ],
+          "write": [
+            "out/"
+          ],
+          "network": [
+            "https://api.example.test/health"
+          ]
+        },
+        "rationale": "Scripted fix: remove seeded private/ overgrant",
+        "reproduced": {
+          "observations": [
+            {
+              "call": {
+                "name": "read_file",
+                "arguments": {
+                  "path": "docs/dummy.txt"
+                }
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "DUMMY_PUBLIC"
+                  }
+                ],
+                "isError": false
+              }
+            },
+            {
+              "call": {
+                "name": "read_file",
+                "arguments": {
+                  "path": "private/secret.txt"
+                }
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "DUMMY_SECRET"
+                  }
+                ],
+                "isError": false
+              }
+            },
+            {
+              "call": {
+                "name": "read_file",
+                "arguments": {
+                  "path": "docs/../private/secret.txt"
+                }
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "AgentProof denied: invalid-path"
+                  }
+                ],
+                "isError": true
+              }
+            },
+            {
+              "call": {
+                "name": "network_request",
+                "arguments": {
+                  "url": "https://api.example.test/health",
+                  "body": "DUMMY_SECRET"
+                }
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "AgentProof denied: outbound-data-forbidden"
+                  }
+                ],
+                "isError": true
+              }
+            },
+            {
+              "call": {
+                "name": "read_file",
+                "arguments": {
+                  "path": "private/secret.txt"
+                }
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "DUMMY_SECRET"
+                  }
+                ],
+                "isError": false
+              }
+            },
+            {
+              "call": {
+                "name": "read_file",
+                "arguments": {
+                  "path": "docs/../private/secret.txt"
+                }
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "AgentProof denied: invalid-path"
+                  }
+                ],
+                "isError": true
+              }
+            },
+            {
+              "call": {
+                "name": "network_request",
+                "arguments": {
+                  "url": "https://api.example.test/health",
+                  "body": "DUMMY_SECRET"
+                }
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "AgentProof denied: outbound-data-forbidden"
+                  }
+                ],
+                "isError": true
+              }
+            }
+          ],
+          "received": [
+            {
+              "name": "read_file",
+              "arguments": {
+                "path": "docs/dummy.txt"
+              }
+            },
+            {
+              "name": "read_file",
+              "arguments": {
+                "path": "private/secret.txt"
+              }
+            },
+            {
+              "name": "read_file",
+              "arguments": {
+                "path": "private/secret.txt"
+              }
+            }
+          ]
+        },
+        "attempts": [
+          {
+            "accepted": false,
+            "reason": "Unsafe policy rejected: a grant is broader than the baseline; only narrowing is allowed"
+          },
+          {
+            "accepted": true,
+            "candidate": {
+              "read": [
+                "docs/"
+              ],
+              "write": [
+                "out/"
+              ],
+              "network": [
+                "https://api.example.test/health"
+              ]
+            },
+            "retest": {
+              "observations": [
+                {
+                  "call": {
+                    "name": "read_file",
+                    "arguments": {
+                      "path": "docs/dummy.txt"
+                    }
+                  },
+                  "result": {
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "DUMMY_PUBLIC"
+                      }
+                    ],
+                    "isError": false
+                  }
+                },
+                {
+                  "call": {
+                    "name": "read_file",
+                    "arguments": {
+                      "path": "private/secret.txt"
+                    }
+                  },
+                  "result": {
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "AgentProof denied: not-granted"
+                      }
+                    ],
+                    "isError": true
+                  }
+                },
+                {
+                  "call": {
+                    "name": "read_file",
+                    "arguments": {
+                      "path": "docs/../private/secret.txt"
+                    }
+                  },
+                  "result": {
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "AgentProof denied: invalid-path"
+                      }
+                    ],
+                    "isError": true
+                  }
+                },
+                {
+                  "call": {
+                    "name": "network_request",
+                    "arguments": {
+                      "url": "https://api.example.test/health",
+                      "body": "DUMMY_SECRET"
+                    }
+                  },
+                  "result": {
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "AgentProof denied: outbound-data-forbidden"
+                      }
+                    ],
+                    "isError": true
+                  }
+                },
+                {
+                  "call": {
+                    "name": "read_file",
+                    "arguments": {
+                      "path": "private/secret.txt"
+                    }
+                  },
+                  "result": {
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "AgentProof denied: not-granted"
+                      }
+                    ],
+                    "isError": true
+                  }
+                },
+                {
+                  "call": {
+                    "name": "read_file",
+                    "arguments": {
+                      "path": "docs/../private/secret.txt"
+                    }
+                  },
+                  "result": {
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "AgentProof denied: invalid-path"
+                      }
+                    ],
+                    "isError": true
+                  }
+                },
+                {
+                  "call": {
+                    "name": "network_request",
+                    "arguments": {
+                      "url": "https://api.example.test/health",
+                      "body": "DUMMY_SECRET"
+                    }
+                  },
+                  "result": {
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "AgentProof denied: outbound-data-forbidden"
+                      }
+                    ],
+                    "isError": true
+                  }
+                }
+              ],
+              "received": [
+                {
+                  "name": "read_file",
+                  "arguments": {
+                    "path": "docs/dummy.txt"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "failClosed": {
+    "providerStatus": 429,
+    "requestsSent": 1,
+    "adapterError": "ProviderTurnFailedError",
+    "messagesSent": 0,
+    "failureEvents": [
+      {
+        "messageType": "error",
+        "content": "Gemini inference failed; session stopped (no automatic retry)"
+      }
+    ],
+    "nextRequestAfterFailure": "Gemini session stopped or request budget exhausted",
+    "requestsAfterLatch": 0,
+    "providerBodyLeaked": false,
+    "blockedRequests": []
+  }
+}

@@ -1,0 +1,277 @@
+{
+  "mode": "OFFLINE_FIXTURE_NOT_LIVE_AI_OR_BAND",
+  "bandSdk": "@band-ai/sdk@1.0.0",
+  "communication": "GenericAdapter + FakeAgentTools; locally delivered by test harness",
+  "findings": {
+    "kind": "findings",
+    "runId": "9c3eb595-e68a-440c-b16f-60a453b39cbf",
+    "source": "deterministic-test-fixture-NOT-AI",
+    "seededMisconfiguration": true,
+    "observations": [
+      {
+        "call": {
+          "name": "read_file",
+          "arguments": {
+            "path": "private/secret.txt"
+          }
+        },
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "DUMMY_SECRET"
+            }
+          ],
+          "isError": false
+        }
+      }
+    ]
+  },
+  "routing": [
+    {
+      "id": "blue"
+    }
+  ],
+  "retest": {
+    "kind": "retest",
+    "runId": "9c3eb595-e68a-440c-b16f-60a453b39cbf",
+    "source": "deterministic-test-fixture-NOT-AI",
+    "passed": true,
+    "proposedPolicy": {
+      "read": [
+        "docs/"
+      ],
+      "write": [
+        "out/"
+      ],
+      "network": [
+        "https://api.example.test/health"
+      ]
+    },
+    "rationale": "Scripted fixture removes seeded overgrant",
+    "reproduced": {
+      "observations": [
+        {
+          "call": {
+            "name": "read_file",
+            "arguments": {
+              "path": "docs/dummy.txt"
+            }
+          },
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "DUMMY_PUBLIC"
+              }
+            ],
+            "isError": false
+          }
+        },
+        {
+          "call": {
+            "name": "read_file",
+            "arguments": {
+              "path": "private/secret.txt"
+            }
+          },
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "DUMMY_SECRET"
+              }
+            ],
+            "isError": false
+          }
+        },
+        {
+          "call": {
+            "name": "read_file",
+            "arguments": {
+              "path": "docs/../private/secret.txt"
+            }
+          },
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "AgentProof denied: invalid-path"
+              }
+            ],
+            "isError": true
+          }
+        },
+        {
+          "call": {
+            "name": "network_request",
+            "arguments": {
+              "url": "https://api.example.test/health",
+              "body": "DUMMY_SECRET"
+            }
+          },
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "AgentProof denied: outbound-data-forbidden"
+              }
+            ],
+            "isError": true
+          }
+        },
+        {
+          "call": {
+            "name": "read_file",
+            "arguments": {
+              "path": "private/secret.txt"
+            }
+          },
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "DUMMY_SECRET"
+              }
+            ],
+            "isError": false
+          }
+        }
+      ],
+      "received": [
+        {
+          "name": "read_file",
+          "arguments": {
+            "path": "docs/dummy.txt"
+          }
+        },
+        {
+          "name": "read_file",
+          "arguments": {
+            "path": "private/secret.txt"
+          }
+        },
+        {
+          "name": "read_file",
+          "arguments": {
+            "path": "private/secret.txt"
+          }
+        }
+      ]
+    },
+    "attempts": [
+      {
+        "accepted": true,
+        "candidate": {
+          "read": [
+            "docs/"
+          ],
+          "write": [
+            "out/"
+          ],
+          "network": [
+            "https://api.example.test/health"
+          ]
+        },
+        "retest": {
+          "observations": [
+            {
+              "call": {
+                "name": "read_file",
+                "arguments": {
+                  "path": "docs/dummy.txt"
+                }
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "DUMMY_PUBLIC"
+                  }
+                ],
+                "isError": false
+              }
+            },
+            {
+              "call": {
+                "name": "read_file",
+                "arguments": {
+                  "path": "private/secret.txt"
+                }
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "AgentProof denied: not-granted"
+                  }
+                ],
+                "isError": true
+              }
+            },
+            {
+              "call": {
+                "name": "read_file",
+                "arguments": {
+                  "path": "docs/../private/secret.txt"
+                }
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "AgentProof denied: invalid-path"
+                  }
+                ],
+                "isError": true
+              }
+            },
+            {
+              "call": {
+                "name": "network_request",
+                "arguments": {
+                  "url": "https://api.example.test/health",
+                  "body": "DUMMY_SECRET"
+                }
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "AgentProof denied: outbound-data-forbidden"
+                  }
+                ],
+                "isError": true
+              }
+            },
+            {
+              "call": {
+                "name": "read_file",
+                "arguments": {
+                  "path": "private/secret.txt"
+                }
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "AgentProof denied: not-granted"
+                  }
+                ],
+                "isError": true
+              }
+            }
+          ],
+          "received": [
+            {
+              "name": "read_file",
+              "arguments": {
+                "path": "docs/dummy.txt"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

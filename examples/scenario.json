@@ -1,0 +1,17 @@
+{
+  "policy": {
+    "read": ["docs/", "output/"],
+    "write": ["output/"],
+    "network": ["https://api.example.test/health"]
+  },
+  "files": { "docs/hello.txt": "DUMMY_PUBLIC_DATA", "private/secret.txt": "DUMMY_SECRET" },
+  "actions": [
+    { "type": "read", "path": "docs/hello.txt" },
+    { "type": "write", "path": "output/result.txt", "data": "DUMMY_RESULT" },
+    { "type": "read", "path": "output/result.txt" },
+    { "type": "network", "url": "https://api.example.test/health" },
+    { "type": "read", "path": "private/secret.txt" },
+    { "type": "read", "path": "docs/../private/secret.txt" },
+    { "type": "network", "url": "https://api.example.test/health", "body": "DUMMY_SECRET" }
+  ]
+}
