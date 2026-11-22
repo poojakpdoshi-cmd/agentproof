@@ -3,7 +3,7 @@ import test from 'node:test';
 import { FakeAgentTools } from '@band-ai/sdk/testing';
 import { offline } from '../agents/offline.ts';
 import { baseline, safePolicy, probe } from '../agents/lab.ts';
-import { handler, config } from '../agents/band.ts';
+import { handler, config, liveRecorder } from '../agents/band.ts';
 import { red, blue } from '../agents/workflow.ts';
 import { localModel } from '../agents/model.ts';
 
@@ -44,6 +44,30 @@ test('unauthorized rooms/senders and duplicate starts never invoke reasoning or 
   await run(input); await run(input);
   assert.equal(calls, 1);
   assert.equal(tools.messagesSent.length, 1);
+});
+
+test('live evidence recorder redacts platform IDs and keys and sanitizes failures', async () => {
+  const { mkdtempSync, readFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const path = await import('node:path');
+  const dir = mkdtempSync(path.join(tmpdir(), 'agentproof-evidence-'));
+  const env = { BAND_RED_ID: 'RED-ID-DUMMY', BAND_RED_API_KEY: 'RED-KEY-DUMMY', BAND_BLUE_ID: 'BLUE-ID-DUMMY',
+    BAND_BLUE_API_KEY: 'BLUE-KEY-DUMMY', BAND_OWNER_ID: 'OWNER-ID-DUMMY', BAND_ROOM_ID: 'ROOM-ID-DUMMY',
+    GEMINI_API_KEY: 'GEMINI-KEY-DUMMY', AI_PROVIDER: 'gemini' };
+  try {
+    const file = path.join(dir, 'live.json');
+    const tools = new FakeAgentTools();
+    const run = handler('red', { source: 'fixture', decide: async () => { throw new Error('fail at C:\\Users\\someone\\x.txt'); } },
+      'ROOM-ID-DUMMY', 'BLUE-ID-DUMMY', 'OWNER-ID-DUMMY', liveRecorder(file, env));
+    await assert.rejects(run({ roomId: 'ROOM-ID-DUMMY', message: { id: 'MSG-1', senderId: 'OWNER-ID-DUMMY', content: 'start' }, tools }));
+    const text = readFileSync(file, 'utf8');
+    for (const value of Object.values(env).filter(v => v !== 'gemini')) assert.equal(text.includes(value), false);
+    assert.equal(text.includes('someone'), false);
+    const events = JSON.parse(text).events;
+    assert.deepEqual(events.map((e: any) => e.event), ['received', 'failed']);
+    assert.match(events[0].from, /^owner sha256:[0-9a-f]{12}$/);
+    assert.equal(events[1].error, 'Error');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('missing credentials fail before live connections; no provider fallback', async () => {
