@@ -2,6 +2,8 @@
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { toolGate } from './mcp-policy.ts';
+import { mcpGuard } from './guard/mcp-guard.ts';
+import type { ToolAction } from './guard/firewall.ts';
 import { lines, message, rpcError, send, MAX_FRAME } from './mcp-protocol.ts';
 import type { Id, Message } from './mcp-protocol.ts';
 import { record } from './validation.ts';
@@ -9,16 +11,24 @@ import { record } from './validation.ts';
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   if (args.length === 1 && args[0] === '--help') {
-    process.stdout.write('Usage: node src/mcp-proxy.ts --policy policy.json -- COMMAND [ARGS...]\n');
+    process.stdout.write('Usage: node src/mcp-proxy.ts --policy policy.json -- COMMAND [ARGS...]\n'
+      + '       node src/mcp-proxy.ts --mandate mandate.json [--evidence evidence.jsonl] -- COMMAND [ARGS...]\n');
     return;
   }
-  if (args[0] !== '--policy' || !args[1] || args[2] !== '--' || !args[3]) throw new Error('Invalid arguments');
+  const guardMode = args[0] === '--mandate';
+  const evidence = guardMode && args[2] === '--evidence' ? args[3] : undefined;
+  const separator = evidence === undefined ? 2 : 4;
+  if ((args[0] !== '--policy' && !guardMode) || !args[1] || args[separator] !== '--' || !args[separator + 1]
+    || (guardMode && args[2] === '--evidence' && !evidence)) throw new Error('Invalid arguments');
   const policyBytes = readFileSync(args[1]);
   if (policyBytes.length > MAX_FRAME) throw new Error('Policy too large');
-  // Invalid policy aborts before the upstream process is even created.
-  const gate = toolGate(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(policyBytes)));
-  const child = spawn(args[3], args.slice(4), { stdio: ['pipe', 'pipe', 'pipe'], shell: false });
-  const clientPending = new Map<Id, string>();
+  // Invalid policy or mandate aborts before the upstream process is even created.
+  const config: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(policyBytes));
+  const guard = guardMode ? mcpGuard(config, { evidence }) : undefined;
+  const gate = guard ? guard.gate : toolGate(config);
+  const command = args[separator + 1];
+  const child = spawn(command, args.slice(separator + 2), { stdio: ['pipe', 'pipe', 'pipe'], shell: false });
+  const clientPending = new Map<Id, { method: string; actionId?: string; action?: ToolAction }>();
   const serverPending = new Set<Id>();
   const clientSeen = new Set<Id>();
   const serverSeen = new Set<Id>();
@@ -82,7 +92,7 @@ async function main(): Promise<void> {
         await error(-32000, 'Initialization required'); continue;
       }
       if (value.method === 'tools/call') {
-        const decision = gate(value.params);
+        const decision: ReturnType<typeof gate> & { actionId?: string; action?: ToolAction } = gate(value.params);
         audit(decision.tool, decision.allowed ? 'allow' : 'deny', decision.reason);
         if (!decision.allowed) {
           await send(process.stdout, { jsonrpc: '2.0', id: value.id,
@@ -90,11 +100,15 @@ async function main(): Promise<void> {
           continue;
         }
         value.params = decision.params;
+        if (clientPending.size >= 128) throw new Error('Too many pending requests');
+        clientPending.set(value.id!, { method: value.method, actionId: decision.actionId, action: decision.action });
+        await send(child.stdin, value);
+        continue;
       } else if (!['initialize', 'ping', 'tools/list'].includes(value.method)) {
         await error(-32601, 'Method not supported by AgentProof'); continue;
       }
       if (clientPending.size >= 128) throw new Error('Too many pending requests');
-      clientPending.set(value.id!, value.method);
+      clientPending.set(value.id!, { method: value.method });
       await send(child.stdin, value);
     }
     child.stdin.end();
@@ -108,8 +122,18 @@ async function main(): Promise<void> {
       const value: unknown = JSON.parse(line);
       if (!message(value)) throw new Error('Invalid server message');
       if (!value.method) {
-        const method = clientPending.get(value.id!);
-        if (!method) throw new Error('Unsolicited server response');
+        const pending = clientPending.get(value.id!);
+        if (!pending) throw new Error('Unsolicited server response');
+        const method = pending.method;
+        // Guard mode: verify tool output (secret redaction, injection flags, data-flow taint)
+        // and show the agent only the tools its mandate can ever authorize.
+        if (guard && Object.hasOwn(value, 'result')) {
+          if (method === 'tools/call' && pending.actionId && pending.action) {
+            const verified = guard.output(pending.actionId, pending.action, value.result);
+            if (!record(verified)) throw new Error('Invalid tool result');
+            value.result = verified;
+          } else if (method === 'tools/list') value.result = guard.listTools(value.result);
+        }
         if (method === 'initialize') {
           if (Object.hasOwn(value, 'error')) state = 'new';
           else {
