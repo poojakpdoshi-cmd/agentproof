@@ -192,12 +192,18 @@ export class Firewall {
       const secretFound = parsed.outbound.some(text => findSecrets(text).length > 0);
       if (secretFound && WEIGHTS.secretInOutbound(parsed.effect) > 0) factors.push({ code: 'SECRET_IN_OUTBOUND', points: WEIGHTS.secretInOutbound(parsed.effect), detail: `credential pattern in outbound data: ${secretTypes(outbound).join(',')}` });
       if (session.taint.matches(outbound) && WEIGHTS.sensitiveDataFlow(parsed.effect) > 0) factors.push({ code: 'SENSITIVE_DATA_FLOW', points: WEIGHTS.sensitiveDataFlow(parsed.effect), detail: 'outbound data contains content read from a sensitive source' });
+      if (session.taint.confidential && ['egress', 'send', 'execute'].includes(parsed.effect)) {
+        factors.push({ code: 'CONFIDENTIAL_CONTEXT', points: WEIGHTS.confidentialContext, detail: 'session context holds protected content or credentials' });
+      }
       const propagated = detectInjection(outbound);
       if (propagated.score >= 0.5) factors.push({ code: 'INJECTION_IN_OUTBOUND', points: WEIGHTS.injectionInOutbound, detail: `outbound content carries instructions: ${propagated.signals.join(',')}` });
     }
 
     // 4. Operation semantics.
     if (parsed.effect === 'egress' || parsed.effect === 'send') factors.push({ code: 'EXTERNAL_EGRESS', points: WEIGHTS.externalEgress, detail: `data leaves via ${parsed.tool}${parsed.host ? ' to ' + parsed.host : ''}` });
+    if (parsed.effect === 'egress' && (typeof parsed.arguments.body === 'string' || !['GET', 'HEAD', undefined].includes(parsed.arguments.method as string | undefined))) {
+      factors.push({ code: 'OUTBOUND_PAYLOAD', points: WEIGHTS.outboundPayload, detail: `uploads data with ${String(parsed.arguments.method ?? 'GET')}` });
+    }
     if (parsed.destructive) factors.push({ code: 'DESTRUCTIVE_OPERATION', points: WEIGHTS.destructive, detail: `${parsed.tool} is destructive` });
     if (parsed.effect === 'admin' || (parsed.effect === 'execute' && commandFlags(parsed.resource).privileged)) factors.push({ code: 'PRIVILEGE_ESCALATION', points: WEIGHTS.privilegeEscalation, detail: 'action changes privileges or runs privileged commands' });
     if (parsed.effect === 'execute' && commandFlags(parsed.resource).chained) factors.push({ code: 'COMMAND_CHAINING', points: WEIGHTS.commandChaining, detail: 'command contains chaining, piping or substitution' });

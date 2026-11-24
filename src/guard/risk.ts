@@ -12,15 +12,17 @@ export const WEIGHTS = Object.freeze({
   directInjection: 20, // multiplied by detector score for trusted user text
   targetFromUntrusted: (e: Effect) => e === 'read' ? 20 : e === 'write' ? 30 : 45,
   unattributedTarget: (e: Effect) => e === 'read' || e === 'write' ? 0 : 15,
-  secretInOutbound: (e: Effect) => outboundEffect(e) ? 60 : e === 'write' ? 25 : 0,
+  secretInOutbound: (e: Effect) => outboundEffect(e) ? 60 : e === 'write' ? 40 : 0,
   sensitiveDataFlow: (e: Effect) => outboundEffect(e) ? 70 : e === 'write' ? 30 : 0,
   externalEgress: 15,
+  outboundPayload: 20, // egress that uploads a body or uses a non-GET/HEAD method
   destructive: 35,
   privilegeEscalation: 50,
   commandChaining: 20,
   protectedResource: 30,
   policyConflict: 20,
-  injectionInOutbound: 15,
+  injectionInOutbound: 25, // persisting or sending text that carries instructions (memory poisoning)
+  confidentialContext: 30, // outbound action after protected content or credentials entered the session
 });
 
 export const HARD_BLOCK = Object.freeze(['INVALID_REQUEST', 'UNKNOWN_TOOL', 'INVALID_ARGUMENTS', 'INVALID_RESOURCE', 'UNKNOWN_MANDATE',
@@ -32,7 +34,7 @@ export const total = (factors: readonly Factor[]) => Math.min(100, factors.reduc
 
 const THREATS: Record<string, string> = {
   INJECTION_IN_UNTRUSTED_CONTEXT: 'PROMPT_INJECTION', DIRECT_INJECTION: 'PROMPT_INJECTION', TARGET_FROM_UNTRUSTED: 'PROMPT_INJECTION',
-  INJECTION_IN_OUTBOUND: 'PROMPT_INJECTION', SECRET_IN_OUTBOUND: 'CREDENTIAL_EXPOSURE', SENSITIVE_DATA_FLOW: 'DATA_EXFILTRATION',
+  INJECTION_IN_OUTBOUND: 'PROMPT_INJECTION', OUTBOUND_PAYLOAD: 'DATA_EXFILTRATION', SECRET_IN_OUTBOUND: 'CREDENTIAL_EXPOSURE', SENSITIVE_DATA_FLOW: 'DATA_EXFILTRATION', CONFIDENTIAL_CONTEXT: 'DATA_EXFILTRATION',
   PRIVILEGE_ESCALATION: 'PRIVILEGE_ESCALATION', DESTRUCTIVE_OPERATION: 'DESTRUCTIVE_ACTION', COMMAND_CHAINING: 'COMMAND_INJECTION',
   NOT_IN_MANDATE: 'UNAUTHORIZED_ACCESS', EXPLICIT_DENY: 'UNAUTHORIZED_ACCESS', PROTECTED_RESOURCE: 'UNAUTHORIZED_ACCESS',
   IDENTITY_MISMATCH: 'IDENTITY_MISMATCH', MANDATE_EXPIRED: 'EXPIRED_AUTHORITY', MANDATE_NOT_YET_VALID: 'EXPIRED_AUTHORITY',

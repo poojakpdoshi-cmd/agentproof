@@ -17,7 +17,10 @@ test('MCP proxy --mandate mode: intercepts, filters tool list, redacts output, w
   const mandate = path.join(root, 'mandate.json'), evidence = path.join(root, 'evidence.jsonl'), journal = path.join(root, 'journal.jsonl');
   writeFileSync(mandate, JSON.stringify({ id: 'docs-task', subject: { agent: 'docs-agent', user: 'u1' }, objective: 'Read docs/dummy.txt and write notes to out/',
     expiresAt: '2099-01-01T00:00:00Z', allow: [{ tools: ['read_file'], resources: ['docs/', 'out/'] }, { tools: ['write_file'], resources: ['out/'] }],
-    deny: [{ tools: ['*'], resources: ['private/'] }] }));
+    deny: [{ tools: ['*'], resources: ['private/'] }],
+    // Default approval threshold (40) would hold the credential write for review; this test
+    // raises it so the write reaches upstream and output redaction can be observed.
+    thresholds: { approval: 45, block: 70 } }));
   const transport = new StdioClientTransport({ command: process.execPath, stderr: 'pipe',
     args: [proxy, '--mandate', mandate, '--evidence', evidence, '--', process.execPath, dummy, '--journal', journal] });
   transport.stderr?.resume();

@@ -163,6 +163,12 @@ test('data-flow: content from a protected source cannot leave, even encoded', as
   }
 });
 
+test('credentials written into deliverables require human review by default', () => {
+  const verdict = firewall().evaluate(req('write_file', { path: 'out/debug.log', data: 'key ' + FAKE.github }, [{ source: 'user', text: base.objective }]));
+  assert.equal(verdict.decision, 'REQUIRE_APPROVAL');
+  assert.ok(verdict.reasons.includes('SECRET_IN_OUTBOUND'));
+});
+
 test('execution binding: forged, replayed, swapped and expired tokens never execute', async () => {
   const clock = { now: NOW };
   let executed = 0;

@@ -26,7 +26,8 @@ const mentionsWord = (text: string, word: string) => new RegExp(`(?:^|[^a-z0-9_.
 // selected by injected text rather than by the principal.
 export function targetOrigin(action: ParsedAction, mandate: Mandate, segments: readonly Segment[]): Origin {
   const trustedText = normalize([mandate.objective, ...segments.filter(s => trusted(s.source)).map(s => s.text)].join('\n'));
-  const untrustedText = normalize(segments.filter(s => !trusted(s.source)).map(s => s.text).join('\n'));
+  // Include decoded (base64/hex/percent) views: encoded instructions still choose targets.
+  const untrustedText = normalize(segments.filter(s => !trusted(s.source)).flatMap(s => decodedViews(s.text)).join('\n'));
   const kind = action.contract.resource.kind;
   const exactInMandate = mandate.allow.some(rule => (rule.tools.includes(action.tool) || rule.tools.includes('*')) && rule.resources.some(raw => {
     const pattern = normalizePattern(raw, kind);
@@ -79,11 +80,16 @@ export function decodedViews(text: string): string[] {
 export class TaintTracker {
   #exact = new Set<string>();
   #shingles = new Set<string>();
+  #confidential = false;
   static readonly LIMIT = 200_000;
+
+  // Coarse label: protected content or a credential has entered this session's context.
+  get confidential(): boolean { return this.#confidential; }
 
   get size(): number { return this.#exact.size + this.#shingles.size; }
 
   addSensitive(content: string): void {
+    this.#confidential = true;
     const text = squash(content);
     if (text.length >= 8 && text.length <= SHINGLE) this.#exact.add(text);
     for (let i = 0; i + SHINGLE <= text.length && this.#shingles.size < TaintTracker.LIMIT; i += 4) this.#shingles.add(text.slice(i, i + SHINGLE));
@@ -92,11 +98,14 @@ export class TaintTracker {
 
   addSecrets(content: string): number {
     const found = findSecrets(content);
+    if (found.length > 0) this.#confidential = true;
     for (const f of found) {
       const secret = content.slice(f.start, f.end);
       // Store the credential value itself; for KEY=value forms, also the value part.
       for (const value of [secret, secret.split(/[:=]\s*["']?/).slice(1).join('=')]) {
-        if (value.length >= 8 && this.#exact.size < TaintTracker.LIMIT) this.#exact.add(squash(value));
+        // Trailing punctuation is usually prose around the secret, not part of it.
+        const trimmed = value.replace(/[)\]}>.,;:!?'"]+$/, '');
+        if (trimmed.length >= 8 && this.#exact.size < TaintTracker.LIMIT) this.#exact.add(squash(trimmed));
       }
     }
     return found.length;
