@@ -13,6 +13,10 @@ the test suite on Node 24 (Ubuntu, Windows); the benchmark is not run in CI.
   drove fixes; the code was frozen and committed (`64fbfaf`) before the first holdout run, and
   the holdout miss below was *not* tuned away. Both sets have the same author, so this is not
   independent red-teaming.
+- **Post-holdout change, disclosed:** after the first holdout run, scanning this repository with
+  the credential detector showed it flagged code such as `token = v.decision`. The pattern was
+  tightened for precision (unquoted values need 8+ credential characters and a digit). All
+  scenarios were re-run on the final code; every decision metric is identical to the first run.
 - **Definitions.** Attack detected = decision ≠ `ALLOW`. False positive = benign decision
   stricter than expected (benign cases expecting `REQUIRE_APPROVAL` by policy count as correct).
   Legitimate completion = benign `ALLOW`, or expected approval. Deterministic bypass = an attack
@@ -47,8 +51,8 @@ stays blind.
 | Evidence tamper (1,000 trials, 10 classes) | hash chain only: **70%** detected (misses all tail truncations, whole-chain rewrites, re-MACs with a wrong key); hash chain + HMAC + anchor: **100%**; false alarms on intact ledger: 0 |
 | Concurrency | 1,000 concurrent executions of 200 tokens → 200 executions, **0 double-spends**; 50 parallel decisions against a 10-call budget → 10 allowed; ledgers verify |
 | Integration failures (36 benign × 7 authorizer modes) | throws / timeout / malformed / unknown → **100% fail closed**; deny → block; review → approval; healthy → 33 allow + 3 policy approvals |
-| Decision latency | p50 **0.15 ms**, p95 **0.27 ms**, p99 0.68 ms, max 4.0 ms (3,750 samples); sustained 10k: p95 0.13 ms |
-| Memory | +19.7 MiB heap after 10k decisions (includes 10k retained evidence entries); RSS 145 MiB |
+| Decision latency | p50 **0.15 ms**, p95 **0.25 ms**, p99 0.75 ms, max 4.2 ms (3,750 samples); sustained 10k: p95 0.17 ms |
+| Memory | +19.7 MiB heap after 10k decisions (includes 10k retained evidence entries); RSS 149 MiB |
 | Adversarial context (64 × 64 KiB hostile outputs) | 174 ms first decision, ~38 ms after scan caching |
 
 ## Limitations

@@ -19,7 +19,7 @@ npm run dashboard   # http://127.0.0.1:8787/  (or open docs/demo/dashboard.html)
 | 1:40 | `BINDING CHECK` line | "An authorized token replayed with a modified payload is refused: decision and execution must match." |
 | 1:50 | dashboard → click the blocked email | "Every decision is explained: reason codes, risk factors with points, policy version, evidence entry." |
 | 2:20 | `TAMPER TEST` line, then `npm run verify -- docs/demo/evidence.jsonl` | "Flip one BLOCK to ALLOW and verification fails at that entry. With an HMAC key and an external anchor we also catch truncation and full rewrites. It is tamper-evident, not tamper-proof." |
-| 2:40 | BENCHMARK_RESULTS.md table | "125 scenarios; on the blind holdout set 95.8% detection, 0% false positives, zero deterministic bypasses, p95 decision latency 0.27 ms. One holdout miss is documented, not hidden." |
+| 2:40 | BENCHMARK_RESULTS.md table | "125 scenarios; on the blind holdout set 95.8% detection, 0% false positives, zero deterministic bypasses, p95 decision latency 0.25 ms. One holdout miss is documented, not hidden." |
 
 Deterministic fallback: everything above is offline and needs no keys. Optional extras:
 `node --test test/agntid.test.ts` (AgntID adapter vs **mock** runtime) and the MCP proxy guard mode:

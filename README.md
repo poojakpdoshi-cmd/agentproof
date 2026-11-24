@@ -53,7 +53,7 @@ if (v.decision === 'ALLOW') await fw.execute(v.token, { tool: 'send_email', argu
 | Deterministic-policy bypasses (all 125 scenarios) | 0/67 |
 | Evidence tamper detection (hash chain + HMAC + anchor) | 100% of 1,000 trials (70% with the hash chain alone) |
 | Concurrent token double-spends | 0 of 1,000 attempts |
-| Decision latency | p95 0.27 ms |
+| Decision latency | p95 0.25 ms |
 
 ## Documentation
 [ARCHITECTURE](ARCHITECTURE.md) · [THREAT_MODEL](THREAT_MODEL.md) · [SECURITY](SECURITY.md) ·

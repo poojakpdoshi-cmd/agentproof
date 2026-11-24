@@ -20,3 +20,6 @@ screenshots/
 *.webp
 *.gif
 *.bmp
+
+# Evidence written by ad-hoc proxy runs (docs/demo/ holds the committed demo evidence).
+/evidence.jsonl

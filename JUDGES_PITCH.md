@@ -10,7 +10,7 @@ URL came only from untrusted content, or the payload carries data read from a pr
 (even base64-encoded), the action is blocked or sent to a human. Allowed actions get a one-time
 token bound to their exact digest, so what was approved is what runs. Every decision lands in a
 hash-chained, HMAC-signed evidence log anyone can verify. On a blind holdout set: 95.8%
-detection, 0% false positives, zero deterministic bypasses, 0.27 ms p95. It runs as a drop-in
+detection, 0% false positives, zero deterministic bypasses, 0.25 ms p95. It runs as a drop-in
 MCP proxy, needs no LLM to decide, and layers under AgntID's runtime with fail-closed semantics.
 
 ## 3-minute presentation
@@ -54,7 +54,7 @@ MCP proxy, needs no LLM to decide, and layers under AgntID's runtime with fail-c
 | Generative AI | agents that stay on task under injected content | legit completion 100%, provenance explanation |
 | Developer tools | drop-in MCP proxy + library, zero runtime deps | one-line proxy command, mandate JSON, tests |
 | Responsible AI | explainable, accountable decisions | factor-by-factor scores, human approval, verifiable evidence |
-| General innovation | safer adoption of autonomous agents | A/B demo, latency 0.27 ms p95 |
+| General innovation | safer adoption of autonomous agents | A/B demo, latency 0.25 ms p95 |
 
 Check each event's rules on pre-existing projects before submitting: the repository's first
 commits are dated 2026-11-22, and the guard pipeline was added on 2026-11-24 (see git history).
