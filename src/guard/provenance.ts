@@ -78,47 +78,59 @@ export function decodedViews(text: string): string[] {
 }
 
 export class TaintTracker {
-  #exact = new Set<string>();
-  #shingles = new Set<string>();
-  #confidential = false;
+  // Fingerprint -> source labels (a canonical resource path, or 'credential').
+  #exact = new Map<string, Set<string>>();
+  #shingles = new Map<string, Set<string>>();
+  #labels = new Set<string>();
   static readonly LIMIT = 200_000;
 
   // Coarse label: protected content or a credential has entered this session's context.
-  get confidential(): boolean { return this.#confidential; }
-
+  get confidential(): boolean { return this.#labels.size > 0; }
+  // Every source label that has entered this session (for session-level flow rules).
+  get labels(): ReadonlySet<string> { return this.#labels; }
   get size(): number { return this.#exact.size + this.#shingles.size; }
 
-  addSensitive(content: string): void {
-    this.#confidential = true;
+  #put(map: Map<string, Set<string>>, key: string, label: string): void {
+    let set = map.get(key);
+    if (!set) { if (map.size >= TaintTracker.LIMIT) return; set = new Set(); map.set(key, set); }
+    set.add(label);
+  }
+
+  addSensitive(content: string, label = 'protected'): void {
+    this.#labels.add(label);
     const text = squash(content);
-    if (text.length >= 8 && text.length <= SHINGLE) this.#exact.add(text);
-    for (let i = 0; i + SHINGLE <= text.length && this.#shingles.size < TaintTracker.LIMIT; i += 4) this.#shingles.add(text.slice(i, i + SHINGLE));
+    if (text.length >= 8 && text.length <= SHINGLE) this.#put(this.#exact, text, label);
+    for (let i = 0; i + SHINGLE <= text.length; i += 4) this.#put(this.#shingles, text.slice(i, i + SHINGLE), label);
     this.addSecrets(content);
   }
 
   addSecrets(content: string): number {
     const found = findSecrets(content);
-    if (found.length > 0) this.#confidential = true;
+    if (found.length > 0) this.#labels.add('credential');
     for (const f of found) {
       const secret = content.slice(f.start, f.end);
       // Store the credential value itself; for KEY=value forms, also the value part.
       for (const value of [secret, secret.split(/[:=]\s*["']?/).slice(1).join('=')]) {
         // Trailing punctuation is usually prose around the secret, not part of it.
         const trimmed = value.replace(/[)\]}>.,;:!?'"]+$/, '');
-        if (trimmed.length >= 8 && this.#exact.size < TaintTracker.LIMIT) this.#exact.add(squash(trimmed));
+        if (trimmed.length >= 8) this.#put(this.#exact, squash(trimmed), 'credential');
       }
     }
     return found.length;
   }
 
-  matches(outbound: string): boolean {
-    if (this.size === 0 || !outbound) return false;
+  // Labels whose content appears in outbound text, including decoded views.
+  matchLabels(outbound: string): Set<string> {
+    const found = new Set<string>();
+    if (this.size === 0 || !outbound) return found;
     for (const view of decodedViews(outbound)) {
       const text = squash(view);
-      for (const value of this.#exact) if (text.includes(value)) return true;
+      for (const [value, labels] of this.#exact) if (text.includes(value)) labels.forEach(l => found.add(l));
       // Shingles were sampled every 4 characters, so test every offset.
-      for (let i = 0; i + SHINGLE <= text.length; i++) if (this.#shingles.has(text.slice(i, i + SHINGLE))) return true;
+      for (let i = 0; i + SHINGLE <= text.length; i++) this.#shingles.get(text.slice(i, i + SHINGLE))?.forEach(l => found.add(l));
     }
-    return false;
+    return found;
   }
+
+  matches(outbound: string): boolean { return this.matchLabels(outbound).size > 0; }
 }

@@ -7,7 +7,7 @@ import type { Contract, ParsedAction } from './contracts.ts';
 import { JAILBREAK_SIGNALS, detectInjection } from './injection.ts';
 import { EvidenceLedger } from './ledger.ts';
 import type { Anchor } from './ledger.ts';
-import { parseMandate, protectedScope, ruleMatches } from './mandate.ts';
+import { flowSourceMatches, parseMandate, patternMatches, normalizePattern, protectedScope, ruleMatches } from './mandate.ts';
 import type { Mandate } from './mandate.ts';
 import { SOURCES, TaintTracker, targetOrigin, trusted } from './provenance.ts';
 import type { Segment } from './provenance.ts';
@@ -85,11 +85,27 @@ export class Firewall {
       const mandate = parseMandate(input, this.#contracts);
       if (this.#mandates.has(mandate.id)) throw new Error('Duplicate mandate id');
       this.#mandates.set(mandate.id, mandate);
-      this.ledger.append('mandate', { mandate: mandate.id, version: mandate.version, agent: mandate.agent, user: mandate.user,
-        objective: mandate.objective, expiresAt: new Date(mandate.expiresAt).toISOString(),
-        allow: mandate.allow.map(r => ({ id: r.id, tools: r.tools, resources: r.resources, approval: r.approval, maxCalls: r.maxCalls })),
-        deny: mandate.deny.map(r => ({ id: r.id, tools: r.tools, resources: r.resources })), protected: mandate.protected, thresholds: mandate.thresholds });
+      this.#recordMandate(mandate);
     }
+  }
+
+  #recordMandate(mandate: Mandate, extra: Record<string, unknown> = {}): void {
+    this.ledger.append('mandate', { mandate: mandate.id, version: mandate.version, agent: mandate.agent, user: mandate.user,
+      objective: mandate.objective, expiresAt: new Date(mandate.expiresAt).toISOString(),
+      allow: mandate.allow.map(r => ({ id: r.id, tools: r.tools, resources: r.resources, approval: r.approval, maxCalls: r.maxCalls })),
+      deny: mandate.deny.map(r => ({ id: r.id, tools: r.tools, resources: r.resources })), protected: mandate.protected, thresholds: mandate.thresholds,
+      flows: mandate.flows, trustedTargets: mandate.trustedTargets, ...extra });
+  }
+
+  // Versioned policy change (repair apply / rollback). Outstanding tokens and approvals issued
+  // under the previous version stop working: consume() rejects them with POLICY_CHANGED.
+  replaceMandate(input: unknown, reason: string): Mandate {
+    const next = parseMandate(input, this.#contracts);
+    const current = this.#mandates.get(next.id);
+    if (!current) throw new Error('Unknown mandate');
+    this.#mandates.set(next.id, next);
+    this.#recordMandate(next, { replaces: current.version, reason: reason.slice(0, 200) });
+    return next;
   }
 
   #session(id: string): Session {
@@ -99,11 +115,12 @@ export class Firewall {
   }
 
   // Record content entering the agent's context outside execute() (e.g. relayed by a proxy).
-  observe(sessionId: string, source: Segment['source'], text: string, sensitive = false): { secrets: number; injection: string[] } {
+  // `sensitive` is a taint label (normally the canonical source resource) or false.
+  observe(sessionId: string, source: Segment['source'], text: string, sensitive: string | false = false): { secrets: number; injection: string[] } {
     const session = this.#session(sessionId);
     if (!trusted(source)) session.observed.push(Object.freeze({ source, text: text.slice(0, 64 * 1024) }));
     if (session.observed.length > 64) session.observed.shift();
-    if (sensitive) session.taint.addSensitive(text);
+    if (sensitive) session.taint.addSensitive(text, sensitive);
     const secrets = session.taint.addSecrets(text);
     return { secrets, injection: trusted(source) ? [] : detectInjection(text).signals };
   }
@@ -196,16 +213,27 @@ export class Firewall {
 
     // 3. Data flow: credentials and protected content leaving through arguments.
     const outbound = parsed.outbound.join('\n');
+    const labels = outbound ? session.taint.matchLabels(outbound) : new Set<string>();
     if (outbound) {
       const secretFound = parsed.outbound.some(text => findSecrets(text).length > 0);
       if (secretFound && WEIGHTS.secretInOutbound(parsed.effect) > 0) factors.push({ code: 'SECRET_IN_OUTBOUND', points: WEIGHTS.secretInOutbound(parsed.effect), detail: `credential pattern in outbound data: ${secretTypes(outbound).join(', ')}` });
-      if (session.taint.matches(outbound) && WEIGHTS.sensitiveDataFlow(parsed.effect) > 0) factors.push({ code: 'SENSITIVE_DATA_FLOW', points: WEIGHTS.sensitiveDataFlow(parsed.effect), detail: 'outbound data contains content read from a sensitive source' });
+      if (labels.size > 0 && WEIGHTS.sensitiveDataFlow(parsed.effect) > 0) factors.push({ code: 'SENSITIVE_DATA_FLOW', points: WEIGHTS.sensitiveDataFlow(parsed.effect), detail: 'outbound data contains content read from a sensitive source' });
       if (session.taint.confidential && ['egress', 'send', 'execute'].includes(parsed.effect)) {
         factors.push({ code: 'CONFIDENTIAL_CONTEXT', points: WEIGHTS.confidentialContext, detail: 'session context holds protected content or credentials' });
       }
       const propagated = detectInjection(outbound);
       if (propagated.score >= 0.5) factors.push({ code: 'INJECTION_IN_OUTBOUND', points: WEIGHTS.injectionInOutbound, detail: `outbound content carries instructions: ${propagated.signals.join(', ')}` });
     }
+
+    // Mandate data-flow rules (labelled taint) and trusted-target requirements.
+    for (const flow of mandate.flows) {
+      if (!flow.to.includes('*') && !flow.to.includes(parsed.tool)) continue;
+      const hit = [...(flow.match === 'session' ? session.taint.labels : labels)].find(label => flowSourceMatches(flow, label));
+      if (hit === undefined) continue;
+      if (flow.effect === 'deny') reasons.push('FLOW_VIOLATION'); else forceApproval = true;
+      factors.push({ code: 'FLOW_RULE', points: 0, detail: `${flow.id}: data from ${hit} reaches ${parsed.tool} (${flow.effect}, ${flow.match})` });
+    }
+    if (mandate.trustedTargets.includes(parsed.tool) && origin !== 'trusted') reasons.push('UNTRUSTED_TARGET');
 
     // 4. Operation semantics.
     if (parsed.effect === 'egress' || parsed.effect === 'send') factors.push({ code: 'EXTERNAL_EGRESS', points: WEIGHTS.externalEgress, detail: `data leaves via ${parsed.tool}${parsed.host ? ' to ' + parsed.host : ''}` });
@@ -300,6 +328,7 @@ export class Firewall {
   approve(actionId: string, approver: string, approved: boolean): { ok: boolean; token?: string; code?: string } {
     const pending = this.#pending.get(actionId);
     if (!pending || pending.verdict.decision !== 'REQUIRE_APPROVAL' || pending.approved) return { ok: false, code: 'NO_PENDING_APPROVAL' };
+    if (this.#mandates.get(pending.mandate.id)?.version !== pending.mandate.version) { this.#pending.delete(actionId); return { ok: false, code: 'POLICY_CHANGED' }; }
     if (typeof approver !== 'string' || !/^[A-Za-z0-9._@:-]{1,128}$/.test(approver) || approver === pending.agent) return { ok: false, code: 'INVALID_APPROVER' };
     this.ledger.append('approval', { actionId, approver, approved, actionDigest: pending.verdict.actionDigest });
     if (!approved) { this.#pending.delete(actionId); return { ok: true }; }
@@ -329,6 +358,10 @@ export class Firewall {
     if (this.#clock().getTime() > claims.e) return fail('TOKEN_EXPIRED', claims.a);
     const pending = this.#pending.get(claims.a);
     if (!pending || !pending.approved) return fail('NOT_AUTHORIZED', claims.a);
+    if (this.#mandates.get(pending.mandate.id)?.version !== pending.mandate.version) {
+      this.#pending.delete(claims.a);
+      return fail('POLICY_CHANGED', claims.a);
+    }
     let presented = '';
     try { presented = digest(action); } catch { /* non-canonical */ }
     if (!safeEqual(presented, claims.d) || !safeEqual(presented, pending.verdict.actionDigest)) {
@@ -363,16 +396,20 @@ export class Firewall {
   // instructions are flagged and remembered as untrusted context for later decisions.
   verifyOutput(actionId: string, sessionId: string, output: unknown, executor: string, mandate?: Mandate, action?: ToolAction): ExecutionResult & { ok: true } {
     const text = textOf(output);
-    let sensitive = false;
+    // Content from protected scopes, or from any flow-rule source, is tainted with its resource path.
+    let sensitive: string | false = false;
     if (mandate && action) {
       const parsed = parseAction(action, this.#contracts);
-      sensitive = !('error' in parsed) && protectedScope(mandate, parsed).hit;
+      if (!('error' in parsed) && parsed.contract.resource.kind === 'path' && (protectedScope(mandate, parsed).hit
+        || mandate.flows.some(f => f.from.some(raw => { const p = raw === 'credential' ? null : normalizePattern(raw, 'path'); return p !== null && patternMatches(p, parsed.resource, 'path'); })))) {
+        sensitive = parsed.resource;
+      }
     }
     const observed = this.observe(sessionId, 'tool', text, sensitive);
     const redact = this.#options.redactOutputs !== false && observed.secrets > 0;
     const delivered = redact ? redactOutput(output) : output;
     this.ledger.append('execution', { actionId, executor, status: 'ok', outputDigest: sha256(text), outputBytes: Buffer.byteLength(text),
-      secretsRedacted: redact ? observed.secrets : 0, injectionSignals: observed.injection, sensitiveSource: sensitive, preview: clip(redactText(text.slice(0, 300))) });
+      secretsRedacted: redact ? observed.secrets : 0, injectionSignals: observed.injection, sensitiveSource: sensitive !== false, preview: clip(redactText(text.slice(0, 300))) });
     return { ok: true, actionId, output: delivered, secretsRedacted: redact ? observed.secrets : 0, injectionSignals: observed.injection };
   }
 

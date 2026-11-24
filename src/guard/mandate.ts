@@ -7,11 +7,16 @@ import type { Contract, ParsedAction, ResourceKind } from './contracts.ts';
 // An intent mandate is the operator-approved, machine-checkable form of the user's objective:
 // which tools may touch which resources, until when, and which need a human. Deny by default.
 export type Rule = Readonly<{ id: string; tools: readonly string[]; resources: readonly string[]; approval: boolean; maxCalls?: number }>;
+// Data-flow rule: content from matching sources (path patterns, or 'credential') reaching the
+// listed tools requires approval or is denied. 'content' matches the outbound data itself;
+// 'session' triggers once such a source has entered the session at all (coarser, stricter).
+export type FlowRule = Readonly<{ id: string; from: readonly string[]; to: readonly string[]; effect: 'approval' | 'deny'; match: 'content' | 'session' }>;
 export type Mandate = Readonly<{
   id: string; version: string; agent: string; user: string; objective: string;
   notBefore?: number; expiresAt: number;
   allow: readonly Rule[]; deny: readonly Rule[]; protected: readonly string[];
   thresholds: Readonly<{ approval: number; block: number }>;
+  flows: readonly FlowRule[]; trustedTargets: readonly string[];
 }>;
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
@@ -76,7 +81,7 @@ function parseRule(value: unknown, index: number, contracts: Record<string, Cont
 }
 
 export function parseMandate(input: unknown, contracts: Record<string, Contract>): Mandate {
-  if (!record(input) || !keys(input, ['id', 'subject', 'objective', 'notBefore', 'expiresAt', 'allow', 'deny', 'protected', 'thresholds'],
+  if (!record(input) || !keys(input, ['id', 'subject', 'objective', 'notBefore', 'expiresAt', 'allow', 'deny', 'protected', 'thresholds', 'flows', 'trustedTargets'],
     ['id', 'subject', 'objective', 'expiresAt', 'allow'])) throw new Error('Invalid mandate');
   const { id, subject, objective } = input;
   if (typeof id !== 'string' || !ID.test(id) || !record(subject) || !keys(subject, ['agent', 'user'], ['agent', 'user'])
@@ -110,9 +115,39 @@ export function parseMandate(input: unknown, contracts: Record<string, Contract>
       || (t.approval as number) < 1 || (t.approval as number) >= (t.block as number) || (t.block as number) > 100) throw new Error('Invalid thresholds');
     thresholds = { approval: t.approval as number, block: t.block as number };
   }
+  const flows: FlowRule[] = [];
+  if (Object.hasOwn(input, 'flows')) {
+    if (!Array.isArray(input.flows) || input.flows.length > 256) throw new Error('Invalid flow rules');
+    input.flows.forEach((f: unknown, i) => {
+      if (!record(f) || !keys(f, ['id', 'from', 'to', 'effect', 'match'], ['from', 'to', 'effect']) || !stringList(f.from) || f.from.length === 0
+        || !stringList(f.to) || f.to.length === 0 || (f.effect !== 'approval' && f.effect !== 'deny')
+        || (Object.hasOwn(f, 'match') && f.match !== 'content' && f.match !== 'session')
+        || (Object.hasOwn(f, 'id') && (typeof f.id !== 'string' || !ID.test(f.id)))
+        || f.from.some(p => p !== 'credential' && normalizePattern(p, 'path') === null)
+        || f.to.some(t => t !== '*' && !Object.hasOwn(contracts, t))) throw new Error(`Invalid flow rule ${i}`);
+      flows.push(Object.freeze({ id: (f.id as string | undefined) ?? `flow-${i}`, from: Object.freeze([...f.from]), to: Object.freeze([...f.to]),
+        effect: f.effect, match: (f.match as 'content' | 'session' | undefined) ?? 'content' }));
+    });
+  }
+  let trustedTargets: string[] = [];
+  if (Object.hasOwn(input, 'trustedTargets')) {
+    if (!stringList(input.trustedTargets) || input.trustedTargets.some(t => !Object.hasOwn(contracts, t))) throw new Error('Invalid trusted targets');
+    trustedTargets = input.trustedTargets;
+  }
+  const allIds = [...ids, ...flows.map(f => f.id)];
+  if (new Set(allIds).size !== allIds.length) throw new Error('Duplicate mandate rule id');
   return Object.freeze({ id, version: digest(input).slice(0, 16), agent: subject.agent, user: subject.user, objective,
     ...(notBefore === undefined ? {} : { notBefore }), expiresAt, allow, deny, protected: Object.freeze([...protectedResources]),
-    thresholds: Object.freeze(thresholds) });
+    thresholds: Object.freeze(thresholds), flows: Object.freeze(flows), trustedTargets: Object.freeze([...trustedTargets]) });
+}
+
+// Does a taint label (canonical source path, or 'credential') fall under a flow rule's sources?
+export function flowSourceMatches(rule: FlowRule, label: string): boolean {
+  return rule.from.some(raw => {
+    if (raw === 'credential' || label === 'credential') return raw === label;
+    const pattern = normalizePattern(raw, 'path');
+    return pattern !== null && patternMatches(pattern, label, 'path');
+  });
 }
 
 export function ruleMatches(rule: Rule, action: ParsedAction): boolean {
