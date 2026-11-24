@@ -22,6 +22,7 @@
     "verify": "node src/verify-evidence.ts",
     "benchmark:guard": "node --expose-gc benchmarks/guard.ts",
     "benchmark:repair:phase3": "node benchmarks/repair-phase3.ts",
+    "benchmark:validation:phase4": "node benchmarks/validation/phase4.ts",
     "typecheck": "tsc -p ."
   },
   "devDependencies": {
