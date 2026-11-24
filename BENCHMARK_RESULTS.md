@@ -64,3 +64,16 @@ stays blind.
 ## Existing Phase 3 benchmarks
 `npm run benchmark` (policy engine vs Microsoft agent-governance-sdk exact rules) and
 `npm run benchmark:stdio` are unchanged; see `docs/phase3-audit.md`.
+
+## Functionality-preserving repair (new Phase 3)
+
+Reproduce with `npm run benchmark:repair:phase3`. The evaluation definition was frozen at commit
+`0509c8d` before its first run. Previous Phase 2 evaluation cases are development data; the frozen
+set adds nine legitimate tasks with unseen filenames, recipients, endpoints and action variations,
+plus freshly salted attacks. The set is synthetic and self-authored.
+
+Phase 3 optimized repair prevented 100% of 109 baseline vulnerabilities, completed 9/9 legitimate
+tasks unattended, blocked 0/9, introduced zero stricter legitimate steps and zero security regressions,
+and independently re-verified 8/8 certificates. The Phase 2 algorithm completed 6/9 unattended on the
+same holdout. Full strategy and per-environment results are in
+`docs/benchmark/phase3-repair-results.json`.

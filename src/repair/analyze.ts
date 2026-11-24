@@ -63,11 +63,13 @@ export function legitUsage(env: Environment, mandate: Record<string, unknown>): 
 }
 
 // Typed repair operators. Each fires on root-cause facts, not on scenario identity.
-export function candidates(rc: RootCause, mandate: Record<string, unknown>, usage: Map<string, Set<string>>): Candidate[] {
+export function candidates(env: Environment, rc: RootCause, mandate: Record<string, unknown>, usage: Map<string, Set<string>>): Candidate[] {
   const out: Candidate[] = [];
   const v = rc.violation;
+  const risk = (operator: string) => operator === 'narrow-allow' || operator === 'deny-target' || operator === 'deny-tool' ? 3
+    : operator === 'split-approval' || operator === 'threshold' ? 2 : operator === 'deny-scope' || operator === 'protect-source' ? 1 : 0;
   const add = (operator: string, summary: string, patch: PatchOp[], complexity: number) =>
-    out.push({ id: `${operator}:${digest(patch).slice(0, 10)}`, operator, summary, patch, complexity });
+    out.push({ id: `${operator}:${digest(patch).slice(0, 10)}`, operator, summary, patch, complexity, generalizationRisk: risk(operator) });
   const rules = (mandate.allow as Rule[]) ?? [];
   const sinkKind = BUILTIN_CONTRACTS[v.sink]?.resource.kind;
 
@@ -115,6 +117,12 @@ export function candidates(rc: RootCause, mandate: Record<string, unknown>, usag
     }
     add('protect-and-grant', `Protect ${v.asset} but keep it readable with approval`, [{ op: 'replace', path: '/protected', value: [...protectedNow, v.asset] },
       { op: 'add', path: '/allow/-', value: { tools: ['read_file'], resources: [v.asset], approval: true } }], 2);
+    const classified = env.assets.filter(a => a.class !== 'public').map(a => a.path);
+    const protectedClassified = [...new Set([...protectedNow, ...classified])].sort();
+    if (protectedClassified.length > protectedNow.length) {
+      add('protect-classified-sources', `Protect ${classified.length} labelled confidential/credential source(s) without narrowing legitimate scopes`,
+        [{ op: 'replace', path: '/protected', value: protectedClassified }], classified.length);
+    }
   }
   if (rc.causes.includes('RISK_BELOW_THRESHOLD')) {
     const t = (mandate.thresholds as { approval: number; block: number } | undefined) ?? { approval: 40, block: 70 };

@@ -57,6 +57,24 @@ export function targetOrigin(action: ParsedAction, mandate: Mandate, segments: r
   return isTrusted ? 'trusted' : inUntrusted ? 'untrusted' : 'unattributed';
 }
 
+// Stricter origin check for policies that require explicit user authorization of a target.
+// A broad grant conveys authority, not intent: the complete recipient/URL must occur in trusted
+// text or be an exact mandate resource.
+export function explicitTargetOrigin(action: ParsedAction, mandate: Mandate, segments: readonly Segment[]): Origin {
+  const trustedText = normalize([mandate.objective, ...segments.filter(s => trusted(s.source)).map(s => s.text)].join('\n'));
+  const untrustedText = normalize(segments.filter(s => !trusted(s.source)).flatMap(s => decodedViews(s.text)).join('\n'));
+  const kind = action.contract.resource.kind;
+  const exactInMandate = mandate.allow.some(rule => (rule.tools.includes(action.tool) || rule.tools.includes('*')) && rule.resources.some(raw => {
+    const pattern = normalizePattern(raw, kind);
+    return pattern !== null && pattern !== '*' && !pattern.endsWith('/') && !pattern.startsWith('@') && !pattern.endsWith(' *')
+      && pattern === action.resource;
+  }));
+  if (exactInMandate) return 'trusted';
+  const value = action.resource.toLowerCase();
+  if (mentions(trustedText, value)) return 'trusted';
+  return mentions(untrustedText, value) ? 'untrusted' : 'unattributed';
+}
+
 // Session data-flow tracking: content read from protected resources, and any credential
 // found in tool output, is fingerprinted. Outbound arguments are checked for that content,
 // including base64/hex/percent-encoded copies. Fingerprints live in memory only.

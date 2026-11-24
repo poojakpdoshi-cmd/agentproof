@@ -21,6 +21,7 @@
     "dashboard": "node src/dashboard/server.ts --evidence docs/demo/evidence.jsonl --mode \"DEMO (scripted agent, synthetic data)\"",
     "verify": "node src/verify-evidence.ts",
     "benchmark:guard": "node --expose-gc benchmarks/guard.ts",
+    "benchmark:repair:phase3": "node benchmarks/repair-phase3.ts",
     "typecheck": "tsc -p ."
   },
   "devDependencies": {

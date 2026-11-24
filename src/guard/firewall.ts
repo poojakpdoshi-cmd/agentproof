@@ -9,7 +9,7 @@ import { EvidenceLedger } from './ledger.ts';
 import type { Anchor } from './ledger.ts';
 import { flowSourceMatches, parseMandate, patternMatches, normalizePattern, protectedScope, ruleMatches } from './mandate.ts';
 import type { Mandate } from './mandate.ts';
-import { SOURCES, TaintTracker, targetOrigin, trusted } from './provenance.ts';
+import { explicitTargetOrigin, SOURCES, TaintTracker, targetOrigin, trusted } from './provenance.ts';
 import type { Segment } from './provenance.ts';
 import { findSecrets, redactText, redactValue, secretTypes } from './redact.ts';
 import { HARD_BLOCK, WEIGHTS, classify, level, total } from './risk.ts';
@@ -233,7 +233,13 @@ export class Firewall {
       if (flow.effect === 'deny') reasons.push('FLOW_VIOLATION'); else forceApproval = true;
       factors.push({ code: 'FLOW_RULE', points: 0, detail: `${flow.id}: data from ${hit} reaches ${parsed.tool} (${flow.effect}, ${flow.match})` });
     }
-    if (mandate.trustedTargets.includes(parsed.tool) && origin !== 'trusted') reasons.push('UNTRUSTED_TARGET');
+    if (mandate.trustedTargets.includes(parsed.tool)) {
+      // Read-only network calls remain constrained by their reviewed allow scope. Calls carrying
+      // outbound data, and all other target-bearing tools, require the exact target in trusted intent.
+      const readOnlyNetwork = parsed.tool === 'network_request' && typeof parsed.arguments.body !== 'string'
+        && ['GET', 'HEAD', undefined].includes(parsed.arguments.method as string | undefined);
+      if (!readOnlyNetwork && explicitTargetOrigin(parsed, mandate, context) !== 'trusted') reasons.push('UNTRUSTED_TARGET');
+    }
 
     // 4. Operation semantics.
     if (parsed.effect === 'egress' || parsed.effect === 'send') factors.push({ code: 'EXTERNAL_EGRESS', points: WEIGHTS.externalEgress, detail: `data leaves via ${parsed.tool}${parsed.host ? ' to ' + parsed.host : ''}` });

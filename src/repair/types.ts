@@ -21,7 +21,11 @@ export type StepOutcome = { tool: string; resource: string | null; decision: str
 export type ReplayResult = { traceId: string; steps: StepOutcome[]; completed: boolean; blocked: boolean; held: boolean };
 
 export type PatchOp = { op: 'add' | 'replace'; path: string; value: unknown };
-export type Candidate = { id: string; operator: string; summary: string; patch: PatchOp[]; complexity: number };
+export type Candidate = {
+  id: string; operator: string; summary: string; patch: PatchOp[]; complexity: number;
+  // Estimated tendency to over-fit observed examples: 0 contextual/classified, 3 exact/global.
+  generalizationRisk: number;
+};
 export type RootCause = {
   traceId: string; violation: Violation; step: number; decision: string; ruleId: string | null; score: number; approvalThreshold: number;
   factors: string[]; sources: Array<{ step: number; resource: string; class: AssetClass }>; causes: string[]; explanation: string[];
@@ -29,4 +33,5 @@ export type RootCause = {
 export type Evaluation = {
   candidate: Candidate; valid: boolean; error?: string; fixesTarget: boolean; targetDecision: string; vulnerabilitiesFixed: number;
   securityRegressions: number; legitBlocked: number; legitHeld: number; stricterLegitSteps: number; score: number;
+  objectives: { securityGain: number; functionalityLoss: number; approvalBurden: number; policyCost: number; generalizationRisk: number };
 };

@@ -1,4 +1,4 @@
-# Automatic security repair engine (Phase 2)
+# Automatic security repair engine (Phases 2–3)
 
 AgentProof can now find holes in an agent's authorization policy, explain why they exist,
 synthesize minimal policy repairs, prove each repair by replay, and apply it only after a
@@ -18,8 +18,9 @@ policy + labelled synthetic environment
   → approve    PolicyStore: human-only apply, stale-proposal guard, versions, rollback, ledger       src/repair/store.ts
 ```
 
-Ranking score = 100 + 40·(share of current vulnerabilities fixed) − 60·(share of legit tasks newly
-blocked) − 25·(share newly needing approval) − 2·complexity + 5 if the vulnerable step is blocked.
+The original Phase 2 ranking score was 100 + 40·(vulnerability share fixed) − 60·(legitimate
+tasks newly blocked) − 25·(new approvals) − 2·complexity + 5 for blocking the target. It remains
+available as the explicit `phase2` comparison strategy; Phase 3 uses the multi-objective ranking below.
 
 New policy primitives the engine can synthesize (also usable by hand, in `src/guard/mandate.ts`):
 `flows` (labelled data-flow rules: content or session match, approval or deny) and
@@ -34,6 +35,38 @@ node src/repair/server.ts benchmarks/repair/dev-report.ts                  # int
 node benchmarks/repair.ts                                                   # Phase 2 benchmark
 ```
 Static snapshot: `docs/demo/repair-dashboard.html`.
+
+## Phase 3: functionality-preserving synthesis
+
+Phase 3 treats all prior Phase 2 evaluation cases as development data and replaces example-shaped
+repairs with three generalized mechanisms:
+
+- `protect-classified-sources` protects all labelled confidential/credential assets without
+  narrowing the surrounding legitimate read scope to observed filenames.
+- `trusted-target` requires the exact recipient or state-changing network destination to occur in
+  trusted user/operator intent. Read-only GET/HEAD requests remain governed by the reviewed allow scope.
+- bounded pairwise composition merges compatible flow, source-protection, provenance and scoped-deny
+  changes; conflicting scalar patches are rejected.
+
+Eligible candidates must still fix the target and introduce zero security regressions. Ranking then
+scores security gain, blocked legitimate work, extra approvals, stricter legitimate steps, policy
+change cost and estimated generalization risk. Exact-resource narrowing and global thresholds carry
+the highest over-fit penalties. Certificates retain the Phase 2 canonical replay format and verifier.
+
+The Phase 3 holdout was frozen at commit `0509c8d` before its first run. It contains new output
+filenames, recipients, endpoints and action variations; it is self-authored, not independent.
+
+| Strategy | Vulns prevented | Legit completed unattended | Legit not blocked | FP steps | Security regressions |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| original policy | 0% | 100% | 100% | 0% | 0 |
+| Phase 2 automatic | 100% | 66.7% | 66.7% | 16.7% | 0 |
+| **Phase 3 optimized** | **100%** | **100%** | **100%** | **0%** | **0** |
+| manual expert | 96.3% | 88.9% | 88.9% | 5.6% | 0 |
+| deny-all | 100% | 0% | 0% | 50% | 0 |
+| deny-sinks | 95.4% | 11.1% | 11.1% | 44.4% | 0 |
+
+All 8 generated Phase 3 repair certificates independently re-verified. See
+`docs/benchmark/phase3-repair-results.json`; historical Phase 2 results remain unchanged.
 
 ## H-A13, the first regression case
 Phase 1's only holdout miss (approved HR read, then HR text copied into `out/`) is never given to
@@ -81,5 +114,7 @@ Repair for LLM Agents" (arXiv 2609.32428) could not be read and may overlap.
 - Discovery covers exfiltration (7 transforms), untrusted targets and over-reads; not semantic
   misuse inside an allowed action, timing or multi-agent attacks.
 - Least-privilege narrowing over-fits small legit suites (measured above).
+- Phase 3's improved generalization is measured on only nine self-authored legitimate holdout tasks;
+  labels are supplied by the synthetic environment and real-world classification errors are unmeasured.
 - Certificates prove reproducibility of deterministic replay, not real-world safety.
 - No LLM is used to propose repairs; a live LLM agent demo is blocked here (see PROJECT_STATUS.md).

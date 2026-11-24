@@ -8,16 +8,23 @@ import type { DiscoveryOptions } from './discover.ts';
 import { applyPatch, decisionVector, replay } from './replay.ts';
 import type { Candidate, Environment, Evaluation, ReplayResult, RootCause, Trace } from './types.ts';
 
-// Ranking weights (documented, fixed). Eligibility first: the candidate must be a valid policy,
-// stop the vulnerable trace, and re-enable no attack the current policy already stops.
-export const RANK = Object.freeze({ base: 100, perFixedShare: 40, legitBlockedShare: -60, legitHeldShare: -25, complexity: -2, blocksTarget: 5 });
+// Phase 3 multi-objective weights. Eligibility remains hard: a policy must be valid, stop the
+// target, and introduce zero security regressions. The score then balances security coverage,
+// completed work, approval burden, unnecessary policy change, and measured over-fit risk.
+export const RANK = Object.freeze({ base: 100, securityGain: 100, functionalityLoss: -120, approvalBurden: -60,
+  stricterLegitSteps: -20, policyCost: -2, generalizationRisk: -12, blocksTarget: 5 });
+export const PHASE2_RANK = Object.freeze({ base: 100, perFixedShare: 40, legitBlockedShare: -60,
+  legitHeldShare: -25, complexity: -2, blocksTarget: 5 });
+export type RepairStrategy = 'phase2' | 'optimized';
 
 type Suite = { attacks: Trace[]; attackBase: Map<string, ReplayResult>; legit: Trace[]; legitBase: Map<string, ReplayResult> };
 const strict = (d: string) => d === 'BLOCK' ? 2 : d === 'REQUIRE_APPROVAL' ? 1 : 0;
 
-export function evaluate(env: Environment, mandate: Record<string, unknown>, candidate: Candidate, target: Trace, suite: Suite): Evaluation & { after: Record<string, unknown> } {
+export function evaluate(env: Environment, mandate: Record<string, unknown>, candidate: Candidate, target: Trace, suite: Suite,
+  strategy: RepairStrategy = 'optimized'): Evaluation & { after: Record<string, unknown> } {
+  const emptyObjectives = { securityGain: 0, functionalityLoss: 0, approvalBurden: 0, policyCost: 0, generalizationRisk: candidate.generalizationRisk };
   const fail = (error: string) => ({ candidate, valid: false, error, fixesTarget: false, targetDecision: 'n/a', vulnerabilitiesFixed: 0,
-    securityRegressions: 0, legitBlocked: 0, legitHeld: 0, stricterLegitSteps: 0, score: -Infinity, after: mandate });
+    securityRegressions: 0, legitBlocked: 0, legitHeld: 0, stricterLegitSteps: 0, score: -Infinity, objectives: emptyObjectives, after: mandate });
   let after: Record<string, unknown>;
   try { after = applyPatch(mandate, candidate.patch); parseMandate(after, BUILTIN_CONTRACTS); } catch (e) { return fail(e instanceof Error ? e.message : 'invalid'); }
   const t = replay(env, after, target);
@@ -37,10 +44,41 @@ export function evaluate(env: Environment, mandate: Record<string, unknown>, can
   }
   const fixesTarget = !t.completed;
   const n = Math.max(1, suite.legit.length);
-  const score = RANK.base + RANK.perFixedShare * (fixed / Math.max(1, vulnerable)) + RANK.legitBlockedShare * (blocked / n)
-    + RANK.legitHeldShare * (held / n) + RANK.complexity * candidate.complexity + (stop?.decision === 'BLOCK' ? RANK.blocksTarget : 0);
+  const legitSteps = Math.max(1, suite.legit.reduce((sum, trace) => sum + trace.steps.length, 0));
+  const objectives = { securityGain: fixed / Math.max(1, vulnerable), functionalityLoss: blocked / n, approvalBurden: held / n,
+    policyCost: candidate.patch.length + candidate.complexity, generalizationRisk: candidate.generalizationRisk };
+  const score = strategy === 'phase2'
+    ? PHASE2_RANK.base + PHASE2_RANK.perFixedShare * objectives.securityGain + PHASE2_RANK.legitBlockedShare * objectives.functionalityLoss
+      + PHASE2_RANK.legitHeldShare * objectives.approvalBurden + PHASE2_RANK.complexity * candidate.complexity
+      + (stop?.decision === 'BLOCK' ? PHASE2_RANK.blocksTarget : 0)
+    : RANK.base + RANK.securityGain * objectives.securityGain + RANK.functionalityLoss * objectives.functionalityLoss
+      + RANK.approvalBurden * objectives.approvalBurden + RANK.stricterLegitSteps * (stricter / legitSteps)
+      + RANK.policyCost * objectives.policyCost + RANK.generalizationRisk * objectives.generalizationRisk
+      + (stop?.decision === 'BLOCK' ? RANK.blocksTarget : 0);
   return { candidate, valid: true, fixesTarget, targetDecision: stop ? stop.decision : 'ALLOW', vulnerabilitiesFixed: fixed, securityRegressions: regressions,
-    legitBlocked: blocked, legitHeld: held, stricterLegitSteps: stricter, score: Math.round(score * 100) / 100, after };
+    legitBlocked: blocked, legitHeld: held, stricterLegitSteps: stricter, score: Math.round(score * 100) / 100, objectives, after };
+}
+
+const COMPOSABLE = new Set(['flow-rule', 'trusted-target', 'protect-source', 'protect-classified-sources', 'deny-scope']);
+
+// Merge two independent targeted changes. Conflicting scalar replacements are rejected; array
+// replacements are unioned so classified-source and trusted-target rules compose predictably.
+function compose(a: Candidate, b: Candidate): Candidate | null {
+  if (!COMPOSABLE.has(a.operator) || !COMPOSABLE.has(b.operator)) return null;
+  const patch = structuredClone(a.patch);
+  for (const op of b.patch) {
+    const existing = patch.find(p => p.path === op.path && p.op === 'replace');
+    if (existing && op.op === 'replace') {
+      if (!Array.isArray(existing.value) || !Array.isArray(op.value)) {
+        if (digest(existing.value) !== digest(op.value)) return null;
+      } else existing.value = [...new Set([...existing.value, ...op.value])];
+      continue;
+    }
+    if (!patch.some(p => p.op === op.op && p.path === op.path && digest(p.value) === digest(op.value))) patch.push(structuredClone(op));
+  }
+  if (digest(patch) === digest(a.patch) || digest(patch) === digest(b.patch)) return null;
+  return { id: `composite:${digest(patch).slice(0, 10)}`, operator: 'composite', summary: `${a.summary}; ${b.summary}`, patch,
+    complexity: a.complexity + b.complexity, generalizationRisk: Math.max(a.generalizationRisk, b.generalizationRisk) };
 }
 
 export type Proposal = {
@@ -98,7 +136,7 @@ export type RepairReport = {
 // Iterative discover -> analyze -> propose -> verify -> rank loop. Each iteration rediscovers
 // attacks against the *current* (simulated, not yet applied) policy, so a repair that opens or
 // leaves new sinks is probed again. Proposals are applied only by a human (see store.ts).
-export function repair(env: Environment, options: { discovery?: DiscoveryOptions; maxIterations?: number } = {}): RepairReport {
+export function repair(env: Environment, options: { discovery?: DiscoveryOptions; maxIterations?: number; strategy?: RepairStrategy } = {}): RepairReport {
   const started = performance.now();
   let current = structuredClone(env.mandate);
   const attacks = new Map<string, Trace>();
@@ -118,16 +156,30 @@ export function repair(env: Environment, options: { discovery?: DiscoveryOptions
     const groups = new Map<string, RootCause>();
     for (const t of vulns) { const rc = analyze(env, current, t, attackBase.get(t.id)!); if (!groups.has(signature(rc))) groups.set(signature(rc), rc); }
     const seen = new Set<string>();
-    const evaluated: Array<Evaluation & { after: Record<string, unknown>; rc: RootCause; group: number }> = [];
+    const generated: Array<{ candidate: Candidate; rc: RootCause; group: number }> = [];
     [...groups.values()].forEach((rc, group) => {
-      const target = attacks.get(rc.traceId)!;
-      for (const c of candidates(rc, current, usage)) {
+      for (const c of candidates(env, rc, current, usage)) {
+        if (options.strategy === 'phase2' && c.operator === 'protect-classified-sources') continue;
         const key = digest(c.patch);
         if (seen.has(key)) continue;
         seen.add(key);
-        evaluated.push({ ...evaluate(env, current, c, target, suite), rc, group });
+        generated.push({ candidate: c, rc, group });
       }
     });
+    if (options.strategy !== 'phase2') {
+      const singles = [...generated];
+      let added = 0;
+      for (let i = 0; i < singles.length && added < 64; i++) for (let j = i + 1; j < singles.length && added < 64; j++) {
+        if (singles[i].group === singles[j].group) continue;
+        const candidate = compose(singles[i].candidate, singles[j].candidate);
+        if (!candidate) continue;
+        const key = digest(candidate.patch);
+        if (seen.has(key)) continue;
+        seen.add(key); generated.push({ candidate, rc: singles[i].rc, group: singles[i].group }); added++;
+      }
+    }
+    const evaluated: Array<Evaluation & { after: Record<string, unknown>; rc: RootCause; group: number }> = generated.map(({ candidate, rc, group }) => ({
+      ...evaluate(env, current, candidate, attacks.get(rc.traceId)!, suite, options.strategy ?? 'optimized'), rc, group }));
     const eligible = evaluated.filter(e => e.valid && e.fixesTarget && e.securityRegressions === 0)
       .sort((a, b) => b.score - a.score || a.candidate.complexity - b.candidate.complexity || a.candidate.id.localeCompare(b.candidate.id));
     if (eligible.length === 0) break;

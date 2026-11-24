@@ -1,0 +1,288 @@
+{
+  "measuredOn": "2026-11-24",
+  "node": "v24.19.0",
+  "frozenAtCommit": "0509c8d",
+  "disclaimer": "Synthetic, self-authored frozen holdout. Phase 2 evaluation cases are development data. No independent cases were available.",
+  "certificates": {
+    "verified": 8,
+    "total": 8
+  },
+  "summary": {
+    "original": {
+      "vulnerabilitiesPrevented": 0,
+      "legitCompletedUnattended": 100,
+      "legitNotBlocked": 100,
+      "falsePositiveSteps": 0,
+      "securityRegressions": 0
+    },
+    "phase2-auto": {
+      "vulnerabilitiesPrevented": 100,
+      "legitCompletedUnattended": 66.7,
+      "legitNotBlocked": 66.7,
+      "falsePositiveSteps": 16.7,
+      "securityRegressions": 0
+    },
+    "phase3-optimized": {
+      "vulnerabilitiesPrevented": 100,
+      "legitCompletedUnattended": 100,
+      "legitNotBlocked": 100,
+      "falsePositiveSteps": 0,
+      "securityRegressions": 0
+    },
+    "manual-expert": {
+      "vulnerabilitiesPrevented": 96.3,
+      "legitCompletedUnattended": 88.9,
+      "legitNotBlocked": 88.9,
+      "falsePositiveSteps": 5.6,
+      "securityRegressions": 0
+    },
+    "deny-all": {
+      "vulnerabilitiesPrevented": 100,
+      "legitCompletedUnattended": 0,
+      "legitNotBlocked": 0,
+      "falsePositiveSteps": 50,
+      "securityRegressions": 0
+    },
+    "deny-sinks": {
+      "vulnerabilitiesPrevented": 95.4,
+      "legitCompletedUnattended": 11.1,
+      "legitNotBlocked": 11.1,
+      "falsePositiveSteps": 44.4,
+      "securityRegressions": 0
+    }
+  },
+  "environments": [
+    {
+      "environment": "clinic",
+      "baselineVulnerabilities": 29,
+      "holdoutLegitimateTasks": 2,
+      "phase2Operators": [
+        "protect-source"
+      ],
+      "phase3Operators": [
+        "flow-rule",
+        "protect-and-grant"
+      ],
+      "phase3Residual": 0,
+      "strategies": {
+        "original": {
+          "vulnerabilitiesPrevented": 0,
+          "legitCompletedUnattended": 100,
+          "legitNotBlocked": 100,
+          "falsePositiveSteps": 0,
+          "securityRegressions": 0
+        },
+        "phase2-auto": {
+          "vulnerabilitiesPrevented": 100,
+          "legitCompletedUnattended": 100,
+          "legitNotBlocked": 100,
+          "falsePositiveSteps": 0,
+          "securityRegressions": 0
+        },
+        "phase3-optimized": {
+          "vulnerabilitiesPrevented": 100,
+          "legitCompletedUnattended": 100,
+          "legitNotBlocked": 100,
+          "falsePositiveSteps": 0,
+          "securityRegressions": 0
+        },
+        "manual-expert": {
+          "vulnerabilitiesPrevented": 100,
+          "legitCompletedUnattended": 100,
+          "legitNotBlocked": 100,
+          "falsePositiveSteps": 0,
+          "securityRegressions": 0
+        },
+        "deny-all": {
+          "vulnerabilitiesPrevented": 100,
+          "legitCompletedUnattended": 0,
+          "legitNotBlocked": 0,
+          "falsePositiveSteps": 40,
+          "securityRegressions": 0
+        },
+        "deny-sinks": {
+          "vulnerabilitiesPrevented": 96.6,
+          "legitCompletedUnattended": 0,
+          "legitNotBlocked": 0,
+          "falsePositiveSteps": 40,
+          "securityRegressions": 0
+        }
+      }
+    },
+    {
+      "environment": "finance",
+      "baselineVulnerabilities": 40,
+      "holdoutLegitimateTasks": 2,
+      "phase2Operators": [
+        "narrow-allow",
+        "narrow-allow",
+        "threshold"
+      ],
+      "phase3Operators": [
+        "protect-classified-sources",
+        "trusted-target"
+      ],
+      "phase3Residual": 0,
+      "strategies": {
+        "original": {
+          "vulnerabilitiesPrevented": 0,
+          "legitCompletedUnattended": 100,
+          "legitNotBlocked": 100,
+          "falsePositiveSteps": 0,
+          "securityRegressions": 0
+        },
+        "phase2-auto": {
+          "vulnerabilitiesPrevented": 100,
+          "legitCompletedUnattended": 50,
+          "legitNotBlocked": 50,
+          "falsePositiveSteps": 25,
+          "securityRegressions": 0
+        },
+        "phase3-optimized": {
+          "vulnerabilitiesPrevented": 100,
+          "legitCompletedUnattended": 100,
+          "legitNotBlocked": 100,
+          "falsePositiveSteps": 0,
+          "securityRegressions": 0
+        },
+        "manual-expert": {
+          "vulnerabilitiesPrevented": 95,
+          "legitCompletedUnattended": 100,
+          "legitNotBlocked": 100,
+          "falsePositiveSteps": 0,
+          "securityRegressions": 0
+        },
+        "deny-all": {
+          "vulnerabilitiesPrevented": 100,
+          "legitCompletedUnattended": 0,
+          "legitNotBlocked": 0,
+          "falsePositiveSteps": 50,
+          "securityRegressions": 0
+        },
+        "deny-sinks": {
+          "vulnerabilitiesPrevented": 95,
+          "legitCompletedUnattended": 0,
+          "legitNotBlocked": 0,
+          "falsePositiveSteps": 50,
+          "securityRegressions": 0
+        }
+      }
+    },
+    {
+      "environment": "devops2",
+      "baselineVulnerabilities": 9,
+      "holdoutLegitimateTasks": 2,
+      "phase2Operators": [
+        "narrow-allow"
+      ],
+      "phase3Operators": [
+        "flow-rule",
+        "protect-and-grant"
+      ],
+      "phase3Residual": 0,
+      "strategies": {
+        "original": {
+          "vulnerabilitiesPrevented": 0,
+          "legitCompletedUnattended": 100,
+          "legitNotBlocked": 100,
+          "falsePositiveSteps": 0,
+          "securityRegressions": 0
+        },
+        "phase2-auto": {
+          "vulnerabilitiesPrevented": 100,
+          "legitCompletedUnattended": 100,
+          "legitNotBlocked": 100,
+          "falsePositiveSteps": 0,
+          "securityRegressions": 0
+        },
+        "phase3-optimized": {
+          "vulnerabilitiesPrevented": 100,
+          "legitCompletedUnattended": 100,
+          "legitNotBlocked": 100,
+          "falsePositiveSteps": 0,
+          "securityRegressions": 0
+        },
+        "manual-expert": {
+          "vulnerabilitiesPrevented": 100,
+          "legitCompletedUnattended": 100,
+          "legitNotBlocked": 100,
+          "falsePositiveSteps": 0,
+          "securityRegressions": 0
+        },
+        "deny-all": {
+          "vulnerabilitiesPrevented": 100,
+          "legitCompletedUnattended": 0,
+          "legitNotBlocked": 0,
+          "falsePositiveSteps": 50,
+          "securityRegressions": 0
+        },
+        "deny-sinks": {
+          "vulnerabilitiesPrevented": 88.9,
+          "legitCompletedUnattended": 50,
+          "legitNotBlocked": 50,
+          "falsePositiveSteps": 25,
+          "securityRegressions": 0
+        }
+      }
+    },
+    {
+      "environment": "support2",
+      "baselineVulnerabilities": 31,
+      "holdoutLegitimateTasks": 3,
+      "phase2Operators": [
+        "narrow-allow",
+        "narrow-allow",
+        "threshold"
+      ],
+      "phase3Operators": [
+        "composite",
+        "protect-and-grant"
+      ],
+      "phase3Residual": 0,
+      "strategies": {
+        "original": {
+          "vulnerabilitiesPrevented": 0,
+          "legitCompletedUnattended": 100,
+          "legitNotBlocked": 100,
+          "falsePositiveSteps": 0,
+          "securityRegressions": 0
+        },
+        "phase2-auto": {
+          "vulnerabilitiesPrevented": 100,
+          "legitCompletedUnattended": 33.3,
+          "legitNotBlocked": 33.3,
+          "falsePositiveSteps": 40,
+          "securityRegressions": 0
+        },
+        "phase3-optimized": {
+          "vulnerabilitiesPrevented": 100,
+          "legitCompletedUnattended": 100,
+          "legitNotBlocked": 100,
+          "falsePositiveSteps": 0,
+          "securityRegressions": 0
+        },
+        "manual-expert": {
+          "vulnerabilitiesPrevented": 93.5,
+          "legitCompletedUnattended": 66.7,
+          "legitNotBlocked": 66.7,
+          "falsePositiveSteps": 20,
+          "securityRegressions": 0
+        },
+        "deny-all": {
+          "vulnerabilitiesPrevented": 100,
+          "legitCompletedUnattended": 0,
+          "legitNotBlocked": 0,
+          "falsePositiveSteps": 60,
+          "securityRegressions": 0
+        },
+        "deny-sinks": {
+          "vulnerabilitiesPrevented": 96.8,
+          "legitCompletedUnattended": 0,
+          "legitNotBlocked": 0,
+          "falsePositiveSteps": 60,
+          "securityRegressions": 0
+        }
+      }
+    }
+  ]
+}
