@@ -13,12 +13,14 @@ export type Rule = Readonly<{ id: string; tools: readonly string[]; resources: r
 export type FlowRule = Readonly<{ id: string; from: readonly string[]; to: readonly string[]; effect: 'approval' | 'deny'; match: 'content' | 'session' }>;
 export type Classification = Readonly<{ resource: string; class: 'public' | 'confidential' | 'credential'; confidence: number; authority: 'operator' }>;
 export type Declassification = Readonly<{ from: readonly string[]; tools: readonly string[]; resources: readonly string[]; effect: 'allow' | 'approval' | 'deny' }>;
+export type IntentScope = Readonly<{ tools: readonly string[]; resources: readonly string[]; authority: 'operator' }>;
 export type Mandate = Readonly<{
   id: string; version: string; agent: string; user: string; objective: string;
   notBefore?: number; expiresAt: number;
   allow: readonly Rule[]; deny: readonly Rule[]; protected: readonly string[];
   thresholds: Readonly<{ approval: number; block: number }>;
   flows: readonly FlowRule[]; trustedTargets: readonly string[];
+  intentScopes: readonly IntentScope[];
   classifications: readonly Classification[]; enforceLineage: boolean; declassifications: readonly Declassification[];
 }>;
 
@@ -84,7 +86,7 @@ function parseRule(value: unknown, index: number, contracts: Record<string, Cont
 }
 
 export function parseMandate(input: unknown, contracts: Record<string, Contract>): Mandate {
-  if (!record(input) || !keys(input, ['id', 'subject', 'objective', 'notBefore', 'expiresAt', 'allow', 'deny', 'protected', 'thresholds', 'flows', 'trustedTargets', 'classifications', 'enforceLineage', 'declassifications'],
+  if (!record(input) || !keys(input, ['id', 'subject', 'objective', 'notBefore', 'expiresAt', 'allow', 'deny', 'protected', 'thresholds', 'flows', 'trustedTargets', 'intentScopes', 'classifications', 'enforceLineage', 'declassifications'],
     ['id', 'subject', 'objective', 'expiresAt', 'allow'])) throw new Error('Invalid mandate');
   const { id, subject, objective } = input;
   if (typeof id !== 'string' || !ID.test(id) || !record(subject) || !keys(subject, ['agent', 'user'], ['agent', 'user'])
@@ -137,6 +139,18 @@ export function parseMandate(input: unknown, contracts: Record<string, Contract>
     if (!stringList(input.trustedTargets) || input.trustedTargets.some(t => !Object.hasOwn(contracts, t))) throw new Error('Invalid trusted targets');
     trustedTargets = input.trustedTargets;
   }
+  const intentScopes: IntentScope[] = [];
+  if (Object.hasOwn(input, 'intentScopes')) {
+    if (!Array.isArray(input.intentScopes) || input.intentScopes.length > 256) throw new Error('Invalid intent scopes');
+    for (const scope of input.intentScopes) {
+      if (!record(scope) || !keys(scope, ['tools', 'resources', 'authority'], ['tools', 'resources', 'authority'])
+        || !stringList(scope.tools) || scope.tools.length === 0 || !stringList(scope.resources) || scope.resources.length === 0
+        || scope.authority !== 'operator' || scope.tools.some(t => !Object.hasOwn(contracts, t)
+          || contracts[t].effect !== 'write' || contracts[t].resource.kind !== 'path')
+        || scope.resources.some(p => normalizePattern(p, 'path') === null || p === '*')) throw new Error('Invalid intent scope');
+      intentScopes.push(Object.freeze({ tools: Object.freeze([...scope.tools]), resources: Object.freeze([...scope.resources]), authority: 'operator' }));
+    }
+  }
   if (Object.hasOwn(input, 'enforceLineage') && typeof input.enforceLineage !== 'boolean') throw new Error('Invalid lineage setting');
   const classifications: Classification[] = [];
   if (Object.hasOwn(input, 'classifications')) {
@@ -167,6 +181,7 @@ export function parseMandate(input: unknown, contracts: Record<string, Contract>
   return Object.freeze({ id, version: digest(input).slice(0, 16), agent: subject.agent, user: subject.user, objective,
     ...(notBefore === undefined ? {} : { notBefore }), expiresAt, allow, deny, protected: Object.freeze([...protectedResources]),
     thresholds: Object.freeze(thresholds), flows: Object.freeze(flows), trustedTargets: Object.freeze([...trustedTargets]),
+    intentScopes: Object.freeze(intentScopes),
     classifications: Object.freeze(classifications), enforceLineage: input.enforceLineage === true, declassifications: Object.freeze(declassifications) });
 }
 

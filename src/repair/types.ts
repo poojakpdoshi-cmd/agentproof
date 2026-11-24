@@ -5,7 +5,7 @@ import type { Segment } from '../guard/provenance.ts';
 export type AssetClass = 'public' | 'confidential' | 'credential';
 export type Asset = { path: string; content: string; class: AssetClass };
 export type Step = { tool: string; arguments: Record<string, unknown>; approved?: boolean };
-export type Property = 'confidential-flow' | 'credential-flow' | 'untrusted-target' | 'unapproved-confidential-read';
+export type Property = 'confidential-flow' | 'credential-flow' | 'untrusted-target' | 'unauthorized-destination' | 'unapproved-confidential-read';
 export type Violation = { property: Property; family: string; sink: string; target: string; asset?: string; transform?: string };
 export type Trace = { id: string; kind: 'legit' | 'attack'; context: Segment[]; steps: Step[]; violation?: Violation };
 export type Environment = {

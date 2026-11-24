@@ -40,6 +40,10 @@ export function analyze(env: Environment, mandate: Record<string, unknown>, trac
     causes.push(outcome.factors.some(f => f === 'TARGET_FROM_UNTRUSTED' || f === 'UNATTRIBUTED_TARGET') ? 'UNTRUSTED_TARGET_BELOW_THRESHOLD' : 'TARGET_PROVENANCE_UNDETECTED');
     explanation.push(`The destination ${v.target} was named only by untrusted content.`);
   }
+  if (v.property === 'unauthorized-destination') {
+    causes.push('DESTINATION_NOT_IN_TRUSTED_INTENT');
+    explanation.push(`The write destination ${v.target} is within a tool grant but outside trusted destination intent.`);
+  }
   if (v.property === 'unapproved-confidential-read') {
     causes.push('CONFIDENTIAL_SOURCE_UNPROTECTED');
     explanation.push(`${v.asset} is confidential but readable without approval.`);
@@ -119,7 +123,8 @@ export function candidates(env: Environment, rc: RootCause, mandate: Record<stri
     const scope = sinkKind === 'email' ? '@' + v.target.split('@')[1] : sinkKind === 'path' || sinkKind === 'url' ? parent(v.target) : null;
     if (scope && scope !== 'https://' && !scope.endsWith('//')) add('deny-scope', `Deny ${v.sink} to ${scope}`, [{ op: 'add', path: '/deny/-', value: { tools: [v.sink], resources: [scope] } }], 1);
   }
-  if (v.property === 'untrusted-target' || rc.factors.includes('TARGET_FROM_UNTRUSTED') || rc.factors.includes('UNATTRIBUTED_TARGET')) {
+  if (v.property === 'untrusted-target' || v.property === 'unauthorized-destination'
+    || rc.factors.includes('TARGET_FROM_UNTRUSTED') || rc.factors.includes('UNATTRIBUTED_TARGET')) {
     const current = (mandate.trustedTargets as string[] | undefined) ?? [];
     if (!current.includes(v.sink)) add('trusted-target', `${v.sink} targets must be named by the user or mandate`, [{ op: 'replace', path: '/trustedTargets', value: [...current, v.sink] }], 1);
   }

@@ -95,7 +95,7 @@ export class Firewall {
       objective: mandate.objective, expiresAt: new Date(mandate.expiresAt).toISOString(),
       allow: mandate.allow.map(r => ({ id: r.id, tools: r.tools, resources: r.resources, approval: r.approval, maxCalls: r.maxCalls })),
       deny: mandate.deny.map(r => ({ id: r.id, tools: r.tools, resources: r.resources })), protected: mandate.protected, thresholds: mandate.thresholds,
-      flows: mandate.flows, trustedTargets: mandate.trustedTargets, classifications: mandate.classifications,
+      flows: mandate.flows, trustedTargets: mandate.trustedTargets, intentScopes: mandate.intentScopes, classifications: mandate.classifications,
       enforceLineage: mandate.enforceLineage, declassifications: mandate.declassifications, ...extra });
   }
 

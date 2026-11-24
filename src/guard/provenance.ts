@@ -20,11 +20,15 @@ function ancestors(path: string): string[] {
 }
 const mentions = (text: string, value: string) => value.length > 0 && text.includes(value.toLowerCase());
 const mentionsWord = (text: string, word: string) => new RegExp(`(?:^|[^a-z0-9_.-])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:$|[^a-z0-9_-])`).test(text);
+const mentionsPath = (text: string, path: string) => new RegExp(`(?:^|[^a-z0-9_./-])${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[^a-z0-9_./-]|\\.(?=$|[^a-z0-9_./-]))`).test(text);
+const inIntentScope = (action: ParsedAction, mandate: Mandate) => mandate.intentScopes.some(scope => scope.tools.includes(action.tool)
+  && scope.resources.some(raw => { const pattern = normalizePattern(raw, 'path'); return pattern !== null && patternMatches(pattern, action.resource, 'path'); }));
 
 // Who chose this target? A destination, recipient, command or path that appears only in
 // untrusted content (and not in the user's objective or the mandate) was most likely
 // selected by injected text rather than by the principal.
 export function targetOrigin(action: ParsedAction, mandate: Mandate, segments: readonly Segment[]): Origin {
+  if (action.contract.resource.kind === 'path' && inIntentScope(action, mandate)) return 'trusted';
   const trustedText = normalize([mandate.objective, ...segments.filter(s => trusted(s.source)).map(s => s.text)].join('\n'));
   // Include decoded (base64/hex/percent) views: encoded instructions still choose targets.
   const untrustedText = normalize(segments.filter(s => !trusted(s.source)).flatMap(s => decodedViews(s.text)).join('\n'));
@@ -61,6 +65,7 @@ export function targetOrigin(action: ParsedAction, mandate: Mandate, segments: r
 // A broad grant conveys authority, not intent: the complete recipient/URL must occur in trusted
 // text or be an exact mandate resource.
 export function explicitTargetOrigin(action: ParsedAction, mandate: Mandate, segments: readonly Segment[]): Origin {
+  if (action.contract.resource.kind === 'path' && inIntentScope(action, mandate)) return 'trusted';
   const trustedText = normalize([mandate.objective, ...segments.filter(s => trusted(s.source)).map(s => s.text)].join('\n'));
   const untrustedText = normalize(segments.filter(s => !trusted(s.source)).flatMap(s => decodedViews(s.text)).join('\n'));
   const kind = action.contract.resource.kind;
@@ -71,8 +76,9 @@ export function explicitTargetOrigin(action: ParsedAction, mandate: Mandate, seg
   }));
   if (exactInMandate) return 'trusted';
   const value = action.resource.toLowerCase();
-  if (mentions(trustedText, value)) return 'trusted';
-  return mentions(untrustedText, value) ? 'untrusted' : 'unattributed';
+  const found = kind === 'path' ? mentionsPath : mentions;
+  if (found(trustedText, value)) return 'trusted';
+  return found(untrustedText, value) ? 'untrusted' : 'unattributed';
 }
 
 // Session data-flow tracking: content read from protected resources, and any credential
