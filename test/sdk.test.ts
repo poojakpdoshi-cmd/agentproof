@@ -57,7 +57,11 @@ test('official legacy SDK client/server: allow executes, deny never reaches hand
   const read = await s.client.callTool({ name: 'read_file', arguments: { path: 'out/dummy.txt' } }, undefined,
     { onprogress: value => progress.push(value) });
   assert.deepEqual(read.structuredContent, { data: 'DUMMY_SDK' });
-  assert.equal(progress.length, 1);
+  // The proxy must relay the progress notification (checked at the transport). The SDK's own
+  // callback can miss it when notification and response share one pipe chunk: notifications
+  // are dispatched on a microtask while _onresponse deletes the handler synchronously.
+  assert.equal(s.received.filter(v => v.method === 'notifications/progress').length, 1);
+  assert.ok(progress.length <= 1);
   const denied = [
     { name: 'read_file', arguments: { path: 'private/secret.txt' } },
     { name: 'write_file', arguments: { path: 'docs/dummy.txt', data: 'DUMMY_ATTACK' } },
@@ -73,7 +77,8 @@ test('official legacy SDK client/server: allow executes, deny never reaches hand
   for (const call of s.sent.filter(v => v.method === 'tools/call')) {
     assert.equal(s.received.filter(v => v.id === call.id && !v.method).length, 1);
   }
-  assert.equal(s.errors.length, 0);
+  // Only the SDK client race described above may surface here (late progress after response).
+  assert.equal(s.errors.filter(e => !/progress notification for an unknown token/.test(e.message)).length, 0);
 });
 
 test('official SDK negotiated capabilities do not advertise methods the proxy blocks', { timeout: 15000 }, async t => {
