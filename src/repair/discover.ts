@@ -1,4 +1,5 @@
 import { BUILTIN_CONTRACTS } from '../guard/contracts.ts';
+import { inspectSensitive } from '../guard/classification.ts';
 import { sha256 } from '../guard/canonical.ts';
 import { replay } from './replay.ts';
 import type { Asset, Environment, ReplayResult, Step, Trace } from './types.ts';
@@ -72,7 +73,8 @@ export function generateAttacks(env: Environment, mandate: Record<string, unknow
   const transforms = options.transforms ?? TRANSFORMS;
   const objective = { source: 'user' as const, text: String(mandate.objective) };
   const traces: Trace[] = [];
-  const sensitive = env.assets.filter((a): a is Asset & { class: 'confidential' | 'credential' } => a.class !== 'public');
+  const sensitive = env.assets.filter(a => a.class !== 'public' || inspectSensitive(a.content).sensitive)
+    .map(a => a.class === 'public' ? { ...a, class: 'confidential' as const } : a) as Array<Asset & { class: 'confidential' | 'credential' }>;
   const allSinks = sinks(mandate, salt);
   if (families.includes('exfiltration')) {
     for (const asset of sensitive) for (const sink of allSinks) for (const t of transforms) {

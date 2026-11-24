@@ -59,7 +59,7 @@ export function evaluate(env: Environment, mandate: Record<string, unknown>, can
     legitBlocked: blocked, legitHeld: held, stricterLegitSteps: stricter, score: Math.round(score * 100) / 100, objectives, after };
 }
 
-const COMPOSABLE = new Set(['flow-rule', 'trusted-target', 'protect-source', 'protect-classified-sources', 'deny-scope']);
+const COMPOSABLE = new Set(['flow-rule', 'trusted-target', 'protect-source', 'protect-classified-sources', 'deny-scope', 'lineage-policy', 'classify-source']);
 
 // Merge two independent targeted changes. Conflicting scalar replacements are rejected; array
 // replacements are unioned so classified-source and trusted-target rules compose predictably.

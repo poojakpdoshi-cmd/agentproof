@@ -2,12 +2,13 @@ import { randomBytes } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { record, keys } from '../validation.ts';
 import { canonical, digest, hmac, safeEqual, sha256 } from './canonical.ts';
+import { inspectSensitive } from './classification.ts';
 import { BUILTIN_CONTRACTS, commandFlags, parseAction } from './contracts.ts';
 import type { Contract, ParsedAction } from './contracts.ts';
 import { JAILBREAK_SIGNALS, detectInjection } from './injection.ts';
 import { EvidenceLedger } from './ledger.ts';
 import type { Anchor } from './ledger.ts';
-import { flowSourceMatches, parseMandate, patternMatches, normalizePattern, protectedScope, ruleMatches } from './mandate.ts';
+import { flowSourceMatches, sourcePatternMatches, parseMandate, patternMatches, normalizePattern, protectedScope, ruleMatches } from './mandate.ts';
 import type { Mandate } from './mandate.ts';
 import { explicitTargetOrigin, SOURCES, TaintTracker, targetOrigin, trusted } from './provenance.ts';
 import type { Segment } from './provenance.ts';
@@ -31,7 +32,7 @@ export type ExecutionResult = { ok: true; actionId: string; output: unknown; sec
   | { ok: false; actionId?: string; code: string };
 
 type Pending = { verdict: Verdict; action: ToolAction; mandate: Mandate; agent: string; approved: boolean };
-type Session = { calls: Map<string, number>; taint: TaintTracker; observed: Segment[] };
+type Session = { calls: Map<string, number>; taint: TaintTracker; observed: Segment[]; uncertain: Set<string> };
 export type FirewallOptions = {
   mandates: unknown[]; contracts?: Record<string, Contract>; ledger?: EvidenceLedger; key?: Buffer; clock?: () => Date;
   ids?: () => string; executor?: Executor; authorizer?: Authorizer; authorizerTimeoutMs?: number; tokenTtlMs?: number; redactOutputs?: boolean;
@@ -94,7 +95,8 @@ export class Firewall {
       objective: mandate.objective, expiresAt: new Date(mandate.expiresAt).toISOString(),
       allow: mandate.allow.map(r => ({ id: r.id, tools: r.tools, resources: r.resources, approval: r.approval, maxCalls: r.maxCalls })),
       deny: mandate.deny.map(r => ({ id: r.id, tools: r.tools, resources: r.resources })), protected: mandate.protected, thresholds: mandate.thresholds,
-      flows: mandate.flows, trustedTargets: mandate.trustedTargets, ...extra });
+      flows: mandate.flows, trustedTargets: mandate.trustedTargets, classifications: mandate.classifications,
+      enforceLineage: mandate.enforceLineage, declassifications: mandate.declassifications, ...extra });
   }
 
   // Versioned policy change (repair apply / rollback). Outstanding tokens and approvals issued
@@ -110,7 +112,7 @@ export class Firewall {
 
   #session(id: string): Session {
     let session = this.#sessions.get(id);
-    if (!session) { session = { calls: new Map(), taint: new TaintTracker(), observed: [] }; this.#sessions.set(id, session); }
+    if (!session) { session = { calls: new Map(), taint: new TaintTracker(), observed: [], uncertain: new Set() }; this.#sessions.set(id, session); }
     return session;
   }
 
@@ -185,6 +187,14 @@ export class Firewall {
     if (denied && allowed.length > 0) factors.push({ code: 'POLICY_CONFLICT', points: WEIGHTS.policyConflict, detail: `deny rule ${denied.id} overrides allow rule ${allowed[0].id}` });
     const scope = protectedScope(mandate, parsed);
     let forceApproval = false;
+    const metadata = parsed.effect === 'read' ? mandate.classifications.find(c => {
+      const pattern = normalizePattern(c.resource, 'path');
+      return pattern !== null && patternMatches(pattern, parsed.resource, 'path');
+    }) : undefined;
+    if (metadata && (metadata.class !== 'public' || metadata.confidence < 0.8)) {
+      forceApproval = true;
+      factors.push({ code: 'CLASSIFICATION_REVIEW', points: 0, detail: `operator classification ${metadata.class}, confidence ${metadata.confidence}` });
+    }
     if (scope.hit) {
       factors.push({ code: 'PROTECTED_RESOURCE_ACCESS', points: WEIGHTS.protectedResource, detail: 'target is inside a protected scope' });
       if (!scope.explicit) reasons.push('PROTECTED_RESOURCE');
@@ -232,6 +242,15 @@ export class Firewall {
       if (hit === undefined) continue;
       if (flow.effect === 'deny') reasons.push('FLOW_VIOLATION'); else forceApproval = true;
       factors.push({ code: 'FLOW_RULE', points: 0, detail: `${flow.id}: data from ${hit} reaches ${parsed.tool} (${flow.effect}, ${flow.match})` });
+    }
+    if (['write', 'send', 'egress', 'execute'].includes(parsed.effect) && session.taint.confidential
+      && (mandate.enforceLineage || mandate.classifications.length > 0 || session.uncertain.size > 0)) {
+      const effects = [...session.taint.labels].map(label => mandate.declassifications.filter(d => d.tools.includes(parsed.tool)
+        && d.resources.some(raw => { const pattern = normalizePattern(raw, parsed.contract.resource.kind); return pattern !== null && patternMatches(pattern, parsed.resource, parsed.contract.resource.kind); })
+        && d.from.some(raw => sourcePatternMatches(raw, label))).map(d => d.effect));
+      if (effects.some(e => e.includes('deny'))) reasons.push('LINEAGE_DENIED');
+      else if (!effects.every(e => e.includes('allow'))) forceApproval = true;
+      factors.push({ code: 'PERSISTENT_LINEAGE', points: 0, detail: effects.every(e => e.includes('allow')) ? 'operator-authorized destination' : 'sensitive session requires review' });
     }
     if (mandate.trustedTargets.includes(parsed.tool)) {
       // Read-only network calls remain constrained by their reviewed allow scope. Calls carrying
@@ -406,9 +425,15 @@ export class Firewall {
     let sensitive: string | false = false;
     if (mandate && action) {
       const parsed = parseAction(action, this.#contracts);
-      if (!('error' in parsed) && parsed.contract.resource.kind === 'path' && (protectedScope(mandate, parsed).hit
-        || mandate.flows.some(f => f.from.some(raw => { const p = raw === 'credential' ? null : normalizePattern(raw, 'path'); return p !== null && patternMatches(p, parsed.resource, 'path'); })))) {
-        sensitive = parsed.resource;
+      if (!('error' in parsed) && parsed.effect === 'read' && parsed.contract.resource.kind === 'path') {
+        const metadata = mandate.classifications.find(c => { const p = normalizePattern(c.resource, 'path'); return p !== null && patternMatches(p, parsed.resource, 'path'); });
+        const inspection = inspectSensitive(text);
+        const listed = protectedScope(mandate, parsed).hit || mandate.flows.some(f => f.from.some(raw => {
+          const p = raw === 'credential' ? null : normalizePattern(raw, 'path'); return p !== null && patternMatches(p, parsed.resource, 'path'); }));
+        if (listed || metadata?.class !== 'public' && metadata !== undefined || inspection.sensitive) sensitive = parsed.resource;
+        if (inspection.sensitive && (!metadata || metadata.class === 'public') || metadata && metadata.confidence < 0.8) {
+          this.#session(sessionId).uncertain.add(parsed.resource);
+        }
       }
     }
     const observed = this.observe(sessionId, 'tool', text, sensitive);

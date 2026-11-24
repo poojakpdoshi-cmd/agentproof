@@ -1,5 +1,6 @@
 import { BUILTIN_CONTRACTS, parseAction } from '../guard/contracts.ts';
 import { digest } from '../guard/canonical.ts';
+import { inspectSensitive } from '../guard/classification.ts';
 import { replay } from './replay.ts';
 import type { Candidate, Environment, PatchOp, ReplayResult, RootCause, Trace } from './types.ts';
 
@@ -21,8 +22,8 @@ export function analyze(env: Environment, mandate: Record<string, unknown>, trac
   const outcome = result.steps[step];
   const thresholds = (mandate.thresholds as { approval: number } | undefined) ?? { approval: 40 };
   const sources = trace.steps.flatMap((s, i) => {
-    const asset = s.tool === 'read_file' ? env.assets.find(a => a.path === s.arguments.path && a.class !== 'public') : undefined;
-    return asset && i < step ? [{ step: i, resource: asset.path, class: asset.class }] : [];
+    const asset = s.tool === 'read_file' ? env.assets.find(a => a.path === s.arguments.path && (a.class !== 'public' || inspectSensitive(a.content).sensitive)) : undefined;
+    return asset && i < step ? [{ step: i, resource: asset.path, class: asset.class === 'public' ? 'confidential' as const : asset.class }] : [];
   });
   const rules = (mandate.allow as Rule[]) ?? [];
   const rule = rules.find((r, i) => (r.id ?? `allow-${i}`) === outcome.ruleId);
@@ -75,6 +76,18 @@ export function candidates(env: Environment, rc: RootCause, mandate: Record<stri
 
   // Data-flow rules over the labelled source (exact asset, its folder, or any covering protected scope).
   if (v.property === 'confidential-flow' || v.property === 'credential-flow') {
+    if (mandate.enforceLineage !== true && v.asset) {
+      const authorized = env.legit.flatMap(t => t.steps.flatMap((step, index) => {
+        if (index === 0 || step.tool !== v.sink) return [];
+        const source = t.steps.slice(0, index).find(s => s.tool === 'read_file' && s.arguments.path === v.asset);
+        const target = resourceOf(step.tool, step.arguments);
+        return source && target && t.context.some(c => c.source === 'user' && c.text.includes(target))
+          ? [{ from: [v.asset], tools: [step.tool], resources: [target], effect: 'allow' }] : [];
+      }));
+      add('lineage-policy', `Track ${v.asset} across the session; review outputs except explicit authorized destinations`,
+        [{ op: 'replace', path: '/enforceLineage', value: true },
+          ...(authorized.length ? [{ op: 'replace' as const, path: '/declassifications', value: authorized }] : [])], 1 + authorized.length);
+    }
     const scopes = new Set<string>();
     for (const s of rc.sources) {
       if (s.class === 'credential') scopes.add('credential');
@@ -111,6 +124,12 @@ export function candidates(env: Environment, rc: RootCause, mandate: Record<stri
     if (!current.includes(v.sink)) add('trusted-target', `${v.sink} targets must be named by the user or mandate`, [{ op: 'replace', path: '/trustedTargets', value: [...current, v.sink] }], 1);
   }
   if (rc.causes.includes('CONFIDENTIAL_SOURCE_UNPROTECTED') && v.asset) {
+    const asset = env.assets.find(a => a.path === v.asset);
+    if (asset && (asset.class !== 'public' || inspectSensitive(asset.content).sensitive)) {
+      const existing = (mandate.classifications as unknown[] | undefined) ?? [];
+      add('classify-source', `Classify ${v.asset} as confidential with operator review`,
+        [{ op: 'replace', path: '/classifications', value: [...existing, { resource: v.asset, class: asset.class === 'credential' ? 'credential' : 'confidential', confidence: 0.8, authority: 'operator' }] }], 1);
+    }
     const protectedNow = (mandate.protected as string[] | undefined) ?? [];
     for (const scope of [v.asset, parent(v.asset)].filter((x): x is string => !!x)) {
       add('protect-source', `Protect ${scope} (explicit grant + approval required)`, [{ op: 'replace', path: '/protected', value: [...protectedNow, scope] }], 1);

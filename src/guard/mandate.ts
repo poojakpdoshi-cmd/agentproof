@@ -11,12 +11,15 @@ export type Rule = Readonly<{ id: string; tools: readonly string[]; resources: r
 // listed tools requires approval or is denied. 'content' matches the outbound data itself;
 // 'session' triggers once such a source has entered the session at all (coarser, stricter).
 export type FlowRule = Readonly<{ id: string; from: readonly string[]; to: readonly string[]; effect: 'approval' | 'deny'; match: 'content' | 'session' }>;
+export type Classification = Readonly<{ resource: string; class: 'public' | 'confidential' | 'credential'; confidence: number; authority: 'operator' }>;
+export type Declassification = Readonly<{ from: readonly string[]; tools: readonly string[]; resources: readonly string[]; effect: 'allow' | 'approval' | 'deny' }>;
 export type Mandate = Readonly<{
   id: string; version: string; agent: string; user: string; objective: string;
   notBefore?: number; expiresAt: number;
   allow: readonly Rule[]; deny: readonly Rule[]; protected: readonly string[];
   thresholds: Readonly<{ approval: number; block: number }>;
   flows: readonly FlowRule[]; trustedTargets: readonly string[];
+  classifications: readonly Classification[]; enforceLineage: boolean; declassifications: readonly Declassification[];
 }>;
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
@@ -81,7 +84,7 @@ function parseRule(value: unknown, index: number, contracts: Record<string, Cont
 }
 
 export function parseMandate(input: unknown, contracts: Record<string, Contract>): Mandate {
-  if (!record(input) || !keys(input, ['id', 'subject', 'objective', 'notBefore', 'expiresAt', 'allow', 'deny', 'protected', 'thresholds', 'flows', 'trustedTargets'],
+  if (!record(input) || !keys(input, ['id', 'subject', 'objective', 'notBefore', 'expiresAt', 'allow', 'deny', 'protected', 'thresholds', 'flows', 'trustedTargets', 'classifications', 'enforceLineage', 'declassifications'],
     ['id', 'subject', 'objective', 'expiresAt', 'allow'])) throw new Error('Invalid mandate');
   const { id, subject, objective } = input;
   if (typeof id !== 'string' || !ID.test(id) || !record(subject) || !keys(subject, ['agent', 'user'], ['agent', 'user'])
@@ -134,20 +137,47 @@ export function parseMandate(input: unknown, contracts: Record<string, Contract>
     if (!stringList(input.trustedTargets) || input.trustedTargets.some(t => !Object.hasOwn(contracts, t))) throw new Error('Invalid trusted targets');
     trustedTargets = input.trustedTargets;
   }
+  if (Object.hasOwn(input, 'enforceLineage') && typeof input.enforceLineage !== 'boolean') throw new Error('Invalid lineage setting');
+  const classifications: Classification[] = [];
+  if (Object.hasOwn(input, 'classifications')) {
+    if (!Array.isArray(input.classifications) || input.classifications.length > 256) throw new Error('Invalid classifications');
+    for (const item of input.classifications) {
+      if (!record(item) || !keys(item, ['resource', 'class', 'confidence', 'authority'], ['resource', 'class', 'confidence', 'authority'])
+        || typeof item.resource !== 'string' || normalizePattern(item.resource, 'path') === null || item.resource === '*'
+        || !['public', 'confidential', 'credential'].includes(String(item.class)) || typeof item.confidence !== 'number'
+        || !Number.isFinite(item.confidence) || item.confidence < 0 || item.confidence > 1 || item.authority !== 'operator') throw new Error('Invalid classification');
+      classifications.push({ resource: item.resource, class: item.class as Classification['class'], confidence: item.confidence, authority: 'operator' });
+    }
+  }
+  const declassifications: Declassification[] = [];
+  if (Object.hasOwn(input, 'declassifications')) {
+    if (!Array.isArray(input.declassifications) || input.declassifications.length > 256) throw new Error('Invalid declassifications');
+    for (const item of input.declassifications) {
+      if (!record(item) || !keys(item, ['from', 'tools', 'resources', 'effect'], ['from', 'tools', 'resources', 'effect'])
+        || !stringList(item.from) || item.from.length === 0 || item.from.some(p => p !== 'credential' && normalizePattern(p, 'path') === null)
+        || !stringList(item.tools) || item.tools.length === 0 || item.tools.some(t => !Object.hasOwn(contracts, t))
+        || !stringList(item.resources) || item.resources.length === 0 || item.tools.some(t => (item.resources as string[]).some((p: string) => normalizePattern(p, contracts[t].resource.kind) === null))
+        || !['allow', 'approval', 'deny'].includes(String(item.effect))
+        || item.effect === 'allow' && item.resources.some((p: string) => p === '*' || p.endsWith('/') || p.startsWith('@'))) throw new Error('Invalid declassification');
+      declassifications.push({ from: [...item.from], tools: [...item.tools], resources: [...item.resources], effect: item.effect as Declassification['effect'] });
+    }
+  }
   const allIds = [...ids, ...flows.map(f => f.id)];
   if (new Set(allIds).size !== allIds.length) throw new Error('Duplicate mandate rule id');
   return Object.freeze({ id, version: digest(input).slice(0, 16), agent: subject.agent, user: subject.user, objective,
     ...(notBefore === undefined ? {} : { notBefore }), expiresAt, allow, deny, protected: Object.freeze([...protectedResources]),
-    thresholds: Object.freeze(thresholds), flows: Object.freeze(flows), trustedTargets: Object.freeze([...trustedTargets]) });
+    thresholds: Object.freeze(thresholds), flows: Object.freeze(flows), trustedTargets: Object.freeze([...trustedTargets]),
+    classifications: Object.freeze(classifications), enforceLineage: input.enforceLineage === true, declassifications: Object.freeze(declassifications) });
 }
 
 // Does a taint label (canonical source path, or 'credential') fall under a flow rule's sources?
 export function flowSourceMatches(rule: FlowRule, label: string): boolean {
-  return rule.from.some(raw => {
-    if (raw === 'credential' || label === 'credential') return raw === label;
-    const pattern = normalizePattern(raw, 'path');
-    return pattern !== null && patternMatches(pattern, label, 'path');
-  });
+  return rule.from.some(raw => sourcePatternMatches(raw, label));
+}
+export function sourcePatternMatches(raw: string, label: string): boolean {
+  if (raw === 'credential' || label === 'credential') return raw === label;
+  const pattern = normalizePattern(raw, 'path');
+  return pattern !== null && patternMatches(pattern, label, 'path');
 }
 
 export function ruleMatches(rule: Rule, action: ParsedAction): boolean {

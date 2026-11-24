@@ -1,0 +1,47 @@
+{
+  "measuredOn": "2026-11-24",
+  "node": "v24.19.0",
+  "freezeCommit": "808ecf0",
+  "note": "Synthetic self-authored frozen cases. Latency is full in-process deterministic replay, including firewall setup and evidence; not per-decision production latency.",
+  "totals": {
+    "attacksPrevented": "4/4",
+    "legitimateUnattended": "5/5",
+    "legitimateBlocked": 0,
+    "approvalSteps": 2,
+    "newlyStricterLegitimateSteps": 0,
+    "certificatesVerified": "0/0"
+  },
+  "latencyMs": {
+    "p50": 1.247,
+    "p95": 3.58,
+    "samples": 270
+  },
+  "scenarios": [
+    {
+      "environment": "phase5-mislabel",
+      "attacks": 2,
+      "prevented": 2,
+      "legitimate": 2,
+      "completed": 2,
+      "blocked": 0,
+      "approvalSteps": 0,
+      "falsePositiveSteps": 0,
+      "repairProposals": [],
+      "certificatesVerified": 0,
+      "certificates": 0
+    },
+    {
+      "environment": "phase5-lineage",
+      "attacks": 2,
+      "prevented": 2,
+      "legitimate": 3,
+      "completed": 3,
+      "blocked": 0,
+      "approvalSteps": 2,
+      "falsePositiveSteps": 0,
+      "repairProposals": [],
+      "certificatesVerified": 0,
+      "certificates": 0
+    }
+  ]
+}

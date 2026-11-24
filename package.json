@@ -23,6 +23,7 @@
     "benchmark:guard": "node --expose-gc benchmarks/guard.ts",
     "benchmark:repair:phase3": "node benchmarks/repair-phase3.ts",
     "benchmark:validation:phase4": "node benchmarks/validation/phase4.ts",
+    "benchmark:validation:phase5": "node benchmarks/validation/phase5.ts",
     "typecheck": "tsc -p ."
   },
   "devDependencies": {
