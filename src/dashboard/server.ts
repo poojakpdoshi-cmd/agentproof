@@ -24,6 +24,7 @@ const anchorRaw = process.env.AGENTPROOF_ANCHOR?.match(/^(\d+):([0-9a-f]{64})$/)
 const anchor: Anchor | undefined = anchorRaw ? { seq: Number(anchorRaw[1]), hash: anchorRaw[2] } : undefined;
 const html = readFileSync(new URL('./index.html', import.meta.url), 'utf8');
 const app = readFileSync(new URL('./app.js', import.meta.url), 'utf8');
+export const css = readFileSync(new URL('./style.css', import.meta.url), 'utf8');
 
 export function state() {
   const parsed = parseJsonl(readFileSync(evidence!, 'utf8'));
@@ -37,7 +38,7 @@ const out = opt('--export');
 if (out) {
   // Self-contained snapshot; JSON is escaped so evidence text cannot close the script element.
   const json = JSON.stringify(state()).replace(/</g, '\\u003c').replace(/[\u2028\u2029]/g, c => '\\u' + c.charCodeAt(0).toString(16));
-  writeFileSync(out, html.replace('<script src="app.js"></script>', () => `<script type="application/json" id="state">${json}</script>\n<script>${app}</script>`));
+  writeFileSync(out, html.replace('<link rel="stylesheet" href="style.css">', () => `<style>${css}</style>`).replace('<script src="app.js"></script>', () => `<script type="application/json" id="state">${json}</script>\n<script>${app}</script>`));
   process.stdout.write(`Wrote ${out}\n`);
 } else {
   const port = Number(opt('--port') ?? 8787);
@@ -50,6 +51,7 @@ if (out) {
     const path = (req.url ?? '/').split('?')[0];
     try {
       if (path === '/') res.writeHead(200, { ...headers, 'Content-Type': 'text/html; charset=utf-8' }).end(html);
+      else if (path === '/style.css') res.writeHead(200, { ...headers, 'Content-Type': 'text/css; charset=utf-8' }).end(css);
       else if (path === '/app.js') res.writeHead(200, { ...headers, 'Content-Type': 'text/javascript; charset=utf-8' }).end(app);
       else if (path === '/api/state') res.writeHead(200, { ...headers, 'Content-Type': 'application/json' }).end(JSON.stringify(state()));
       else res.writeHead(404, headers).end();

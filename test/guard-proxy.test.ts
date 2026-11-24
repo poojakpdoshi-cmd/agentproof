@@ -64,3 +64,36 @@ test('MCP proxy --mandate mode rejects invalid mandates before launching upstrea
   assert.throws(() => readFileSync(marker));
   rmSync(root, { recursive: true, force: true });
 });
+
+test('MCP proxy --approvals: REQUIRE_APPROVAL calls are held until a human approves or rejects', { timeout: 20000 }, async () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'agentproof-approvals-'));
+  const mandate = path.join(root, 'mandate.json'), journal = path.join(root, 'journal.jsonl');
+  const port = 41000 + Math.floor(Math.random() * 2000);
+  writeFileSync(mandate, JSON.stringify({ id: 'held', subject: { agent: 'a', user: 'u' }, objective: 'write notes to out/', expiresAt: '2099-01-01T00:00:00Z',
+    allow: [{ tools: ['write_file'], resources: ['out/'], approval: true }] }));
+  const transport = new StdioClientTransport({ command: process.execPath, stderr: 'pipe',
+    args: [proxy, '--mandate', mandate, '--approvals', String(port), '--approval-timeout', '10', '--', process.execPath, dummy, '--journal', journal] });
+  let stderr = '';
+  (transport.stderr as NodeJS.ReadableStream | null)?.on('data', (c: Buffer) => { stderr += c; });
+  const client = new Client({ name: 'held-test', version: '0' });
+  try {
+    await client.connect(transport, { timeout: 5000 });
+    const token = JSON.parse(stderr.split('\n').find(l => l.includes('"approvals"'))!).token;
+    const api = (p: string, body?: unknown) => fetch(`http://127.0.0.1:${port}${p}`, { method: body ? 'POST' : 'GET',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) }).then(r => r.json());
+    const pendingCall = client.callTool({ name: 'write_file', arguments: { path: 'out/a.md', data: 'ok' } });
+    let pending: Array<{ actionId: string }> = [];
+    for (let i = 0; i < 50 && pending.length === 0; i++) { pending = await api('/pending'); if (!pending.length) await new Promise(r => setTimeout(r, 50)); }
+    assert.equal((await fetch(`http://127.0.0.1:${port}/pending`)).status, 403, 'token required');
+    assert.equal((await api('/decide', { actionId: pending[0].actionId, approver: 'a', approved: true })).code, 'INVALID_APPROVER', 'agent cannot self-approve');
+    assert.deepEqual(await api('/decide', { actionId: pending[0].actionId, approver: 'ops-lead', approved: true }), { ok: true });
+    assert.equal((await pendingCall).isError, false);
+    const rejected = client.callTool({ name: 'write_file', arguments: { path: 'out/b.md', data: 'no' } });
+    for (let i = 0; i < 50 && (pending = await api('/pending')).length === 0; i++) await new Promise(r => setTimeout(r, 50));
+    await api('/decide', { actionId: pending[0].actionId, approver: 'ops-lead', approved: false });
+    assert.equal((await rejected).isError, true);
+    await client.ping();
+    const forwarded = readFileSync(journal, 'utf8').trim().split('\n').map(l => JSON.parse(l)).filter(v => v.method === 'tools/call').map(v => v.params.arguments.path);
+    assert.deepEqual(forwarded, ['out/a.md'], 'only the approved call reached upstream');
+  } finally { await client.close(); await transport.close(); rmSync(root, { recursive: true, force: true }); }
+});

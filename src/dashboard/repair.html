@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="agentproof-token" content="__TOKEN__">
+<title>AgentProof Repair</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>AgentProof <span>· automatic security repair</span></h1>
+  <div class="badges" id="badges"></div>
+</header>
+<main>
+  <section class="kpis" id="kpis" aria-label="Repair summary"></section>
+  <section id="proposals" class="stack"></section>
+  <section class="grid2">
+    <div class="panel"><h2>Policy versions</h2><div class="table-wrap"><table id="versions" class="cards"></table></div></div>
+    <div class="panel"><h2>Human approval</h2><div class="stack">
+      <label class="muted" for="approver">Approver identity (must not be the agent or the engine)</label>
+      <input id="approver" class="text" value="security-lead" autocomplete="off">
+      <div id="message" class="muted" role="status"></div></div></div>
+  </section>
+</main>
+<footer id="footer"></footer>
+<script src="repair.js"></script>
+</body>
+</html>

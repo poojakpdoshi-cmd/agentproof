@@ -16,16 +16,26 @@ async function main(): Promise<void> {
     return;
   }
   const guardMode = args[0] === '--mandate';
-  const evidence = guardMode && args[2] === '--evidence' ? args[3] : undefined;
-  const separator = evidence === undefined ? 2 : 4;
-  if ((args[0] !== '--policy' && !guardMode) || !args[1] || args[separator] !== '--' || !args[separator + 1]
-    || (guardMode && args[2] === '--evidence' && !evidence)) throw new Error('Invalid arguments');
+  // Guard-mode options between the mandate and '--': --evidence FILE, --approvals PORT, --approval-timeout SECONDS.
+  const separator = args.indexOf('--');
+  const options = guardMode ? args.slice(2, separator) : [];
+  const flag = (name: string) => options.includes(name) ? options[options.indexOf(name) + 1] : undefined;
+  if (options.length % 2 !== 0 || options.some((o, i) => i % 2 === 0 && !['--evidence', '--approvals', '--approval-timeout'].includes(o))) throw new Error('Invalid arguments');
+  const evidence = flag('--evidence');
+  const approvalPort = flag('--approvals') === undefined ? undefined : Number(flag('--approvals'));
+  const approvalTimeout = Number(flag('--approval-timeout') ?? 120) * 1000;
+  if ((args[0] !== '--policy' && !guardMode) || !args[1] || separator !== (guardMode ? 2 + options.length : 2) || !args[separator + 1]
+    || (approvalPort !== undefined && !(Number.isInteger(approvalPort) && approvalPort > 0 && approvalPort < 65536))
+    || !(approvalTimeout > 0 && approvalTimeout <= 3_600_000)) throw new Error('Invalid arguments');
   const policyBytes = readFileSync(args[1]);
   if (policyBytes.length > MAX_FRAME) throw new Error('Policy too large');
   // Invalid policy or mandate aborts before the upstream process is even created.
   const config: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(policyBytes));
   const guard = guardMode ? mcpGuard(config, { evidence }) : undefined;
   const gate = guard ? guard.gate : toolGate(config);
+  const approvals = guard && approvalPort !== undefined ? guard.approvalServer(approvalPort) : undefined;
+  if (approvals) process.stderr.write(JSON.stringify({ approvals: `http://127.0.0.1:${approvalPort}`, token: approvals.token }) + '\n');
+  let heldCalls = 0;
   const command = args[separator + 1];
   const child = spawn(command, args.slice(separator + 2), { stdio: ['pipe', 'pipe', 'pipe'], shell: false });
   const clientPending = new Map<Id, { method: string; actionId?: string; action?: ToolAction }>();
@@ -94,6 +104,23 @@ async function main(): Promise<void> {
       if (value.method === 'tools/call') {
         const decision: ReturnType<typeof gate> & { actionId?: string; action?: ToolAction } = gate(value.params);
         audit(decision.tool, decision.allowed ? 'allow' : 'deny', decision.reason);
+        if (!decision.allowed && approvals && guard && decision.reason.startsWith('approval-required')) {
+          // Hold the call (without blocking other traffic) until a human decides or it times out.
+          heldCalls++;
+          const request = value;
+          void guard.hold(decision, approvalTimeout).then(async resolved => {
+            heldCalls--;
+            audit(resolved.tool, resolved.allowed ? 'allow' : 'deny', resolved.reason);
+            if (failed) return;
+            if (resolved.allowed && !child.stdin.writableEnded) {
+              request.params = resolved.params;
+              clientPending.set(request.id!, { method: 'tools/call', actionId: resolved.actionId, action: resolved.action });
+              await send(child.stdin, request);
+            } else await send(process.stdout, { jsonrpc: '2.0', id: request.id,
+              result: { isError: true, content: [{ type: 'text', text: 'AgentProof denied: ' + resolved.reason }] } });
+          }).catch(() => { failed = true; stop(); });
+          continue;
+        }
         if (!decision.allowed) {
           await send(process.stdout, { jsonrpc: '2.0', id: value.id,
             result: { isError: true, content: [{ type: 'text', text: 'AgentProof denied: ' + decision.reason }] } });
@@ -111,6 +138,8 @@ async function main(): Promise<void> {
       clientPending.set(value.id!, { method: value.method });
       await send(child.stdin, value);
     }
+    // Give held approvals a chance to resolve before closing the upstream.
+    while (heldCalls > 0 && !failed) await new Promise(r => setTimeout(r, 50));
     child.stdin.end();
     shutdown = setTimeout(() => { failed = true; stop(); }, 2000);
     shutdown.unref();

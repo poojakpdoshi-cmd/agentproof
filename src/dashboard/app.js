@@ -37,12 +37,14 @@
       ...kv('Truncation', 'Detectable only against an externally recorded head (anchor)'),
       ...(i.issues.length ? kv('Issues', i.issues.map(x => x.code + (x.seq === null ? '' : ' @#' + x.seq)).join(', ')) : []));
     $('mandates').replaceChildren(el('tr', {}, el('th', {}, 'Mandate'), el('th', {}, 'Agent'), el('th', {}, 'User'), el('th', {}, 'Objective'), el('th', {}, 'Expires')),
-      ...state.mandates.map(m => el('tr', {}, el('td', { class: 'mono' }, m.id), el('td', {}, m.agent), el('td', {}, m.user), el('td', {}, m.objective), el('td', { class: 'mono' }, time(m.expiresAt)))));
+      ...state.mandates.map(m => el('tr', {}, el('td', { class: 'mono', 'data-label': 'Mandate' }, m.id), el('td', { 'data-label': 'Agent' }, m.agent), el('td', { 'data-label': 'User' }, m.user),
+        el('td', { 'data-label': 'Objective' }, m.objective), el('td', { class: 'mono', 'data-label': 'Expires' }, time(m.expiresAt)))));
     const rows = state.timeline;
     $('timeline').replaceChildren(el('tr', {}, el('th', {}, 'Time'), el('th', {}, 'Tool'), el('th', {}, 'Target'), el('th', {}, 'Decision'), el('th', {}, 'Risk')),
       ...rows.map(r => el('tr', { class: 'row' + (selected === r.actionId ? ' sel' : ''), onclick: () => { selected = r.actionId; render(state); } },
-        el('td', { class: 'mono' }, time(r.ts).slice(11)), el('td', { class: 'mono' }, r.tool), el('td', { class: 'mono' }, r.resource ?? '–'),
-        el('td', {}, chip(r.final)), el('td', {}, r.score + ' ' + r.level.toLowerCase()))));
+        el('td', { class: 'mono', 'data-label': 'Time' }, time(r.ts).slice(11)), el('td', { class: 'mono', 'data-label': 'Tool' }, r.tool),
+        el('td', { class: 'mono', 'data-label': 'Target' }, r.resource ?? '–'), el('td', { 'data-label': 'Decision' }, chip(r.final)),
+        el('td', { 'data-label': 'Risk' }, r.score + ' ' + r.level.toLowerCase()))));
     const r = rows.find(x => x.actionId === selected);
     if (!r) { $('detail').className = 'empty'; $('detail').replaceChildren('Select an action in the timeline.'); }
     else {
