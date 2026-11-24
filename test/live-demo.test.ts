@@ -27,9 +27,16 @@ test('live demo synthetic environment discovers and certifies a repair; only an 
 test('local agent adapter fails closed without a model and rejects unsupported proposals (mock HTTP only)', async () => {
   const unavailable = new LocalAgent('local-test', async () => { throw new Error('offline'); });
   await assert.rejects(unavailable.preflight(), /not reachable/);
-  const mock = new LocalAgent('local-test', async (url) => new Response(JSON.stringify(String(url).endsWith('/api/tags')
-    ? { models: [{ name: 'local-test' }] }
-    : { message: { content: JSON.stringify({ tool: 'send_email', arguments: { to: 'a@test.local', subject: 'x', body: 'x' } }) } }), { status: 200 }));
+  const mock = new LocalAgent('local-test', async (url, init) => {
+    if (String(url).endsWith('/api/chat')) {
+      const request = JSON.parse(String(init?.body));
+      assert.equal(request.think, false);
+      assert.equal(request.format, 'json');
+    }
+    return new Response(JSON.stringify(String(url).endsWith('/api/tags')
+      ? { models: [{ name: 'local-test' }] }
+      : { message: { content: JSON.stringify({ tool: 'send_email', arguments: { to: 'a@test.local', subject: 'x', body: 'x' } }) } }), { status: 200 });
+  });
   await mock.preflight();
   await assert.rejects(mock.next('task', []), /unsupported tool action/);
 });
