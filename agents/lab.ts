@@ -49,7 +49,7 @@ export async function evaluate(policy: unknown, calls: unknown[]) {
     fileURLToPath(new URL('../src/mcp-proxy.ts', import.meta.url)), '--policy', policyFile, '--', process.execPath,
     fileURLToPath(new URL('../examples/dummy-mcp-server.ts', import.meta.url)), '--journal', journal,
   ] });
-  transport.stderr?.resume();
+  (transport.stderr as NodeJS.ReadableStream | null)?.resume();
   try {
     await client.connect(transport, { timeout: 5000 });
     const observations = [];

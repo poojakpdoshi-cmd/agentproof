@@ -20,13 +20,16 @@
     "demo": "node demo/attack-demo.ts",
     "dashboard": "node src/dashboard/server.ts --evidence docs/demo/evidence.jsonl --mode \"DEMO (scripted agent, synthetic data)\"",
     "verify": "node src/verify-evidence.ts",
-    "benchmark:guard": "node --expose-gc benchmarks/guard.ts"
+    "benchmark:guard": "node --expose-gc benchmarks/guard.ts",
+    "typecheck": "tsc -p ."
   },
   "devDependencies": {
     "@microsoft/agent-governance-sdk": "5.0.0",
     "@modelcontextprotocol/client": "2.4.0",
     "@modelcontextprotocol/sdk": "1.32.2",
-    "@modelcontextprotocol/server": "2.4.0"
+    "@modelcontextprotocol/server": "2.4.0",
+    "@types/node": "^24.19.2",
+    "typescript": "^6.0.3"
   },
   "dependencies": {
     "@band-ai/sdk": "1.0.0"

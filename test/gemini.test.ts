@@ -166,5 +166,5 @@ test('mock Gemini Red -> Blue -> real MCP retest preserves workflow security (NO
   const result = await blue(model, findings);
   assert.equal(calls, 7);
   assert.equal(result.passed, true);
-  assert.equal(result.attempts[0].retest.received.length, 1);
+  assert.equal((result.attempts[0] as any).retest.received.length, 1);
 });

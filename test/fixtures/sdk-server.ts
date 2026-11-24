@@ -35,4 +35,4 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
 const transport = new StdioServerTransport();
 await server.connect(transport);
 const receive = transport.onmessage!;
-transport.onmessage = (message, extra) => { log({ event: 'received', message }); receive(message, extra); };
+transport.onmessage = ((message: any, extra: any) => { log({ event: 'received', message }); (receive as (...a: any[]) => void)(message, extra); }) as typeof receive;

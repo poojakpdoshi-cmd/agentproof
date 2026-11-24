@@ -35,13 +35,13 @@ function setup(t: TestContext, modern = false, proxied = true) {
   const errors: Error[] = [];
   client.onerror = error => { errors.push(error); };
   const send = transport.send.bind(transport);
-  transport.send = async (value: any, ...rest: any[]) => { sent.push(structuredClone(value)); return send(value, ...rest); };
+  transport.send = async (value: any, ...rest: any[]) => { sent.push(structuredClone(value)); return (send as (...a: any[]) => Promise<void>)(value, ...rest); };
   const records = (): any[] => existsSync(journal) ? readFileSync(journal, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line)) : [];
   t.after(async () => { await client.close(); await transport.close(); rmSync(root, { recursive: true, force: true }); });
   async function connect() {
     await client.connect(transport, { timeout: 3000 });
     const receive = transport.onmessage!;
-    transport.onmessage = (value: any, ...rest: any[]) => { received.push(structuredClone(value)); receive(value, ...rest); };
+    transport.onmessage = (value: any, ...rest: any[]) => { received.push(structuredClone(value)); (receive as (...a: any[]) => void)(value, ...rest); };
   }
   return { client, transport, connect, sent, received, records, errors };
 }

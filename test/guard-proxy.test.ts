@@ -23,7 +23,7 @@ test('MCP proxy --mandate mode: intercepts, filters tool list, redacts output, w
     thresholds: { approval: 45, block: 70 } }));
   const transport = new StdioClientTransport({ command: process.execPath, stderr: 'pipe',
     args: [proxy, '--mandate', mandate, '--evidence', evidence, '--', process.execPath, dummy, '--journal', journal] });
-  transport.stderr?.resume();
+  (transport.stderr as NodeJS.ReadableStream | null)?.resume();
   const client = new Client({ name: 'guard-test', version: '0' });
   try {
     await client.connect(transport, { timeout: 5000 });

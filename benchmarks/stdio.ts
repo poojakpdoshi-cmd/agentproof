@@ -18,7 +18,7 @@ try {
     const args = [server, path.join(root, name + '.jsonl')];
     const transport = new StdioClientTransport({ command: process.execPath, stderr: 'pipe',
       args: name === 'direct' ? args : [proxy, '--policy', policy, '--', process.execPath, ...args] });
-    transport.stderr?.resume();
+    (transport.stderr as NodeJS.ReadableStream | null)?.resume();
     const client = new Client({ name: 'dummy-benchmark', version: '0' });
     clients.push(client);
     await client.connect(transport, { timeout: 5000 });
