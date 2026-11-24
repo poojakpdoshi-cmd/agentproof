@@ -1,0 +1,64 @@
+{
+  "id": "q3-summary",
+  "subject": {
+    "agent": "report-agent",
+    "user": "analyst-dana"
+  },
+  "objective": "Summarize reports/q3.md, save the summary to out/q3-summary.md, clean up old drafts in out/drafts/, and email the summary to dana@corp.test",
+  "expiresAt": "2099-01-01T00:00:00Z",
+  "allow": [
+    {
+      "id": "read-reports",
+      "tools": [
+        "read_file"
+      ],
+      "resources": [
+        "reports/"
+      ]
+    },
+    {
+      "id": "write-out",
+      "tools": [
+        "write_file"
+      ],
+      "resources": [
+        "out/"
+      ],
+      "maxCalls": 5
+    },
+    {
+      "id": "mail-corp",
+      "tools": [
+        "send_email"
+      ],
+      "resources": [
+        "@corp.test"
+      ],
+      "maxCalls": 2
+    },
+    {
+      "id": "clean-drafts",
+      "tools": [
+        "delete_file"
+      ],
+      "resources": [
+        "out/drafts/"
+      ],
+      "approval": true
+    }
+  ],
+  "deny": [
+    {
+      "id": "no-secrets",
+      "tools": [
+        "*"
+      ],
+      "resources": [
+        "secrets/"
+      ]
+    }
+  ],
+  "protected": [
+    "reports/hr/"
+  ]
+}

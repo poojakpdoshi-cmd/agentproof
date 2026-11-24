@@ -1,7 +1,7 @@
 {
   "name": "agentproof",
   "version": "0.0.0",
-  "description": "Default-deny agent permission simulator and audited MCP stdio proxy with a Red/Blue agent lab",
+  "description": "Intent-aware runtime firewall for AI agent tool calls: MCP proxy, provenance-based risk, execution binding and tamper-evident evidence, with a Red/Blue agent lab",
   "private": true,
   "type": "module",
   "license": "Apache-2.0",
@@ -16,7 +16,11 @@
     "benchmark:stdio": "node benchmarks/stdio.ts",
     "agents:live": "node --env-file-if-exists=.env agents/band.ts",
     "agents:offline": "node agents/offline.ts",
-    "demo:e2e": "node agents/e2e.ts"
+    "demo:e2e": "node agents/e2e.ts",
+    "demo": "node demo/attack-demo.ts",
+    "dashboard": "node src/dashboard/server.ts --evidence docs/demo/evidence.jsonl --mode \"DEMO (scripted agent, synthetic data)\"",
+    "verify": "node src/verify-evidence.ts",
+    "benchmark:guard": "node --expose-gc benchmarks/guard.ts"
   },
   "devDependencies": {
     "@microsoft/agent-governance-sdk": "5.0.0",

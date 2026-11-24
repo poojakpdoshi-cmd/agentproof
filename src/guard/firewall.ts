@@ -180,7 +180,7 @@ export class Firewall {
       if (trusted(segment.source)) directScore = Math.max(directScore, result.score);
       else untrustedScore = Math.max(untrustedScore, result.score);
     }
-    if (untrustedScore > 0) factors.push({ code: 'INJECTION_IN_UNTRUSTED_CONTEXT', points: Math.round(WEIGHTS.injectionInUntrustedContext * untrustedScore), detail: `detector score ${untrustedScore}: ${[...signals].join(',')}` });
+    if (untrustedScore > 0) factors.push({ code: 'INJECTION_IN_UNTRUSTED_CONTEXT', points: Math.round(WEIGHTS.injectionInUntrustedContext * untrustedScore), detail: `detector score ${untrustedScore}: ${[...signals].join(', ')}` });
     if (directScore > 0) factors.push({ code: 'DIRECT_INJECTION', points: Math.round(WEIGHTS.directInjection * directScore), detail: `detector score ${directScore} in trusted input` });
     const origin = targetOrigin(parsed, mandate, context);
     if (origin === 'untrusted') factors.push({ code: 'TARGET_FROM_UNTRUSTED', points: WEIGHTS.targetFromUntrusted(parsed.effect), detail: 'target appears only in untrusted content' });
@@ -190,13 +190,13 @@ export class Firewall {
     const outbound = parsed.outbound.join('\n');
     if (outbound) {
       const secretFound = parsed.outbound.some(text => findSecrets(text).length > 0);
-      if (secretFound && WEIGHTS.secretInOutbound(parsed.effect) > 0) factors.push({ code: 'SECRET_IN_OUTBOUND', points: WEIGHTS.secretInOutbound(parsed.effect), detail: `credential pattern in outbound data: ${secretTypes(outbound).join(',')}` });
+      if (secretFound && WEIGHTS.secretInOutbound(parsed.effect) > 0) factors.push({ code: 'SECRET_IN_OUTBOUND', points: WEIGHTS.secretInOutbound(parsed.effect), detail: `credential pattern in outbound data: ${secretTypes(outbound).join(', ')}` });
       if (session.taint.matches(outbound) && WEIGHTS.sensitiveDataFlow(parsed.effect) > 0) factors.push({ code: 'SENSITIVE_DATA_FLOW', points: WEIGHTS.sensitiveDataFlow(parsed.effect), detail: 'outbound data contains content read from a sensitive source' });
       if (session.taint.confidential && ['egress', 'send', 'execute'].includes(parsed.effect)) {
         factors.push({ code: 'CONFIDENTIAL_CONTEXT', points: WEIGHTS.confidentialContext, detail: 'session context holds protected content or credentials' });
       }
       const propagated = detectInjection(outbound);
-      if (propagated.score >= 0.5) factors.push({ code: 'INJECTION_IN_OUTBOUND', points: WEIGHTS.injectionInOutbound, detail: `outbound content carries instructions: ${propagated.signals.join(',')}` });
+      if (propagated.score >= 0.5) factors.push({ code: 'INJECTION_IN_OUTBOUND', points: WEIGHTS.injectionInOutbound, detail: `outbound content carries instructions: ${propagated.signals.join(', ')}` });
     }
 
     // 4. Operation semantics.
