@@ -2,29 +2,29 @@
 
 Branch `claude/lucid-brahmagupta-xeckcb`. Not merged to `main`. Last updated 2026-11-24.
 
-## Done (verified locally)
-| Area | State | Evidence |
-| --- | --- | --- |
-| Guard pipeline (`src/guard/`) | mandate, contracts, provenance, taint, injection signals, risk, firewall, binding, ledger | `test/guard.test.ts` |
-| MCP proxy `--mandate` mode | intercept, canonical forward, tools/list filter, output redaction, evidence | `test/guard-proxy.test.ts` |
-| AgntID adapter | SDK-derived contract; authorizer + executor; fail closed | `test/agntid.test.ts` (**mock only**) |
-| Benchmark | 125 scenarios, dev + blind holdout, tamper, concurrency, integration, latency, memory | `docs/benchmark/guard-results.json` |
-| Demo + dashboard + verifier | offline A/B, read-only dashboard, exit-coded verifier | `test/demo-dashboard.test.ts`, `docs/demo/` |
-| Flaky SDK test | root-caused (MCP client microtask race), fixed | `test/sdk.test.ts` |
-| Full suite | **157/157 pass** (Node 22.23.5 local); CI targets Node 24 Ubuntu + Windows | `npm test` |
+## Done (verified locally; CI on Ubuntu + Windows, Node 24)
+| Area | Evidence |
+| --- | --- |
+| Phase 1 guard pipeline, `--mandate` proxy, AgntID adapter (**mock only**), dashboard, demo | `test/guard*.ts`, `test/agntid.test.ts`, `test/demo-dashboard.test.ts` |
+| Phase 1 benchmark (unchanged results) | `docs/benchmark/guard-results.json` |
+| Policy language: labelled data-flow rules, trusted targets, versioned hot swap | `test/repair.test.ts` |
+| Repair engine: discover, root cause, operators, replay, rank, certificates, PolicyStore | `src/repair/`, `test/repair.test.ts` |
+| H-A13 repaired without being shown to the engine | `test/repair.test.ts` |
+| Phase 2 frozen eval (4 envs) vs manual / deny-all / deny-sinks | `docs/benchmark/repair-results.json`, REPAIR_ENGINE.md |
+| Interactive repair dashboard; held proxy approvals (`--approvals`) | `src/repair/server.ts`, `test/guard-proxy.test.ts` |
+| Responsive dashboards (390 px and 1366 px: no horizontal scroll, no clipped cells) | Playwright check |
+| Strict `tsc` (6.0.3) in CI; 163/163 tests | `npm run typecheck`, `npm test` |
 
 ## Not done / blockers
-1. **Live AgntID run**: needs portal account + bootstrap token, Docker host with access to
-   `runtime.agntid.ai`. Blocked in this environment (network policy, no account).
-2. **Official AgntID challenge rules**: `luma.com` blocked here; verify judging criteria,
-   submission method and existing-project rules manually.
-3. Holdout miss H-A13 (protected content copied into a local file). Candidate fix in BENCHMARK_RESULTS.md.
-4. Interactive approval channel in proxy mode (MCP elicitation is refused by design today).
-5. Only stdio MCP; no Streamable HTTP proxy mode. Eight built-in tool contracts; custom contracts
-   are code-level only (no JSON schema for operators yet).
-6. Benchmark is self-authored; run external corpora (garak, PyRIT, AgentDojo-style) next.
-7. Node type stripping does not type-check; no `tsc` gate in CI.
+1. Live AgntID run: needs portal account + bootstrap token; `agntid.ai` blocked here.
+2. Official AgntID challenge rules: `luma.com` blocked here; verify manually.
+3. Live LLM demo: this environment cannot hold credentials for Anthropic hosts; no other model key
+   available. Run with a real model locally (not yet implemented as a script).
+4. Repair: narrow-allow over-fits small legit suites (auto 76.5% vs manual 100% unattended legit).
+5. Phase 1 holdout miss H-A13 stays in the Phase 1 numbers; fixed by repair policy, not by weights.
+6. Proxy is stdio only; 8 built-in tool contracts.
 
 ## Commands
-`npm test` · `npm run demo` · `npm run dashboard` · `npm run verify -- FILE [--anchor SEQ:HASH]` ·
-`npm run benchmark:guard` · `node src/mcp-proxy.ts --mandate M.json --evidence E.jsonl -- CMD`
+`npm test` · `npm run typecheck` · `npm run demo` · `npm run dashboard` · `npm run benchmark:guard` ·
+`node benchmarks/repair.ts` · `node src/repair/cli.ts ENV` · `node src/repair/server.ts ENV` ·
+`node src/mcp-proxy.ts --mandate M.json [--evidence E.jsonl] [--approvals PORT] -- CMD`

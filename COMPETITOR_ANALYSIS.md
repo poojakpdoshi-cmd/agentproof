@@ -35,3 +35,11 @@ hands-on here. "—" means not a primary capability per public material, not "im
 We did not find another open-source drop-in MCP proxy that combines (1)–(3), but the search was
 not exhaustive. Garak, PyRIT and Promptfoo are complementary: they find weaknesses offline;
 AgentProof enforces at runtime and can be benchmarked with their attack corpora in future.
+
+## Automatic repair: related work
+See REPAIR_ENGINE.md ("Prior art"). The find → fix → replay → regression → approve loop exists in
+program repair (SapFix, CodeMender, AIxCC) and, per abstracts, in guardrail/policy work (Lattice,
+AutoSpec, VEPA, CloudFix). AgentProof's contribution is applying that loop to agent tool-call
+authorization with provenance/data-flow root causes and mixed policy operators. It is not the
+first policy-repair or least-privilege-synthesis system, and its synthesized policies under-perform
+an expert on legitimate-task preservation in our own evaluation.

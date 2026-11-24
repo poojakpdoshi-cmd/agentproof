@@ -21,7 +21,7 @@ in outbound arguments, including encoded copies. See [COMPETITOR_ANALYSIS.md](CO
 
 ```sh
 npm ci --ignore-scripts --no-audit --no-fund
-npm test               # 157 tests
+npm test               # 163 tests (+ npm run typecheck)
 npm run demo           # A/B: unprotected agent leaks a synthetic key; protected agent does not
 npm run dashboard      # http://127.0.0.1:8787/  (static copy: docs/demo/dashboard.html)
 npm run verify -- docs/demo/evidence.jsonl
@@ -33,6 +33,9 @@ Protect an MCP server with an intent mandate ([example](examples/demo-mandate.js
 ```sh
 node src/mcp-proxy.ts --mandate examples/demo-mandate.json --evidence evidence.jsonl -- node examples/dummy-mcp-server.ts
 ```
+
+Add `--approvals 8788` to hold `REQUIRE_APPROVAL` calls until an operator decides via the loopback API
+(`GET /pending`, `POST /decide {actionId, approver, approved}`, bearer token printed once to stderr).
 
 Library use:
 
@@ -55,11 +58,25 @@ if (v.decision === 'ALLOW') await fw.execute(v.token, { tool: 'send_email', argu
 | Concurrent token double-spends | 0 of 1,000 attempts |
 | Decision latency | p95 0.25 ms |
 
+## Automatic security repair (Phase 2)
+
+AgentProof also **repairs** policies: it generates synthetic attacks against a policy, finds the
+root cause of each successful one, synthesizes minimal policy repairs (data-flow rules, narrowed
+grants, approvals, denies), proves each by counterfactual and regression replay, and applies it
+only after a human approves, with versions, rollback and re-verifiable certificates. On a frozen
+4-environment set it prevented 100% of vulnerabilities with 0 security regressions but completed
+76.5% of legitimate tasks unattended (manual expert: 96.3% / 100%). See [REPAIR_ENGINE.md](REPAIR_ENGINE.md).
+
+```sh
+node src/repair/server.ts benchmarks/repair/dev-report.ts   # interactive repair dashboard
+node benchmarks/repair.ts                                    # Phase 2 benchmark
+```
+
 ## Documentation
 [ARCHITECTURE](ARCHITECTURE.md) · [THREAT_MODEL](THREAT_MODEL.md) · [SECURITY](SECURITY.md) ·
 [BENCHMARK_RESULTS](BENCHMARK_RESULTS.md) · [COMPETITOR_ANALYSIS](COMPETITOR_ANALYSIS.md) ·
 [AGNTID_INTEGRATION](AGNTID_INTEGRATION.md) · [HACKATHON_DEMO](HACKATHON_DEMO.md) ·
-[JUDGES_PITCH](JUDGES_PITCH.md) · [PROJECT_STATUS](PROJECT_STATUS.md)
+[JUDGES_PITCH](JUDGES_PITCH.md) · [PROJECT_STATUS](PROJECT_STATUS.md) · [REPAIR_ENGINE](REPAIR_ENGINE.md)
 
 **AgntID:** the adapter follows the official `agntid-python` SDK contract and is tested against a
 labelled **mock** runtime only. A live run needs organizer-provided access ([details](AGNTID_INTEGRATION.md)).

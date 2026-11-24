@@ -20,8 +20,10 @@
 - The upstream tool is trusted to honor its contract. AgentProof is not an OS sandbox.
 - Agent and approver identities are asserted by the integration; authenticate them upstream
   (for example with AgntID).
-- In proxy mode, `REQUIRE_APPROVAL` returns an error to the agent (no interactive approval
-  channel yet); library mode supports `approve()`.
+- In proxy mode, `REQUIRE_APPROVAL` is refused unless `--approvals` is set; then the call is held
+  until an operator decides through a loopback, bearer-token API (timeout → refused).
+- Repairs are applied only by a named human approver (never the engine or the agent), only to the
+  exact policy they were verified against, and can be rolled back; all changes are ledgered.
 
 ## Operating guidance
 - Keep mandates narrow and short-lived; prefer exact resources over prefixes.
