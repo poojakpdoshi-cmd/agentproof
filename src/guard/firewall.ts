@@ -66,7 +66,8 @@ export class Firewall {
   #contracts: Record<string, Contract>;
   #sessions = new Map<string, Session>();
   #pending = new Map<string, Pending>();
-  #nonces = new Set<string>();
+  #scans = new Map<string, { score: number; signals: string[] }>(); // injection results by content hash
+  #nonces = new Map<string, number>(); // nonce -> token expiry; pruned once expired
   #key: Buffer;
   #clock: () => Date;
   #ids: () => string;
@@ -152,7 +153,14 @@ export class Firewall {
     const parsed = parseAction(rawAction, this.#contracts);
     if ('error' in parsed) { reasons.push(parsed.error); return finish('BLOCK'); }
     const session = this.#session(sessionId);
-    const context = [...segments, ...session.observed];
+    // Analysis window: newest context first, bounded to 1 MiB so cost per decision is bounded.
+    const context: Segment[] = [];
+    let budget = 1 << 20;
+    for (const segment of [...segments, ...session.observed].reverse()) {
+      if (budget <= 0) break;
+      context.unshift(segment.text.length > budget ? { ...segment, text: segment.text.slice(-budget) } : segment);
+      budget -= segment.text.length;
+    }
 
     // 1. Deterministic authorization: explicit deny > protected scope > allow rules. Deny by default.
     const denied = mandate.deny.find(rule => ruleMatches(rule, parsed));
@@ -175,7 +183,7 @@ export class Firewall {
     let untrustedScore = 0, directScore = 0;
     const signals = new Set<string>();
     for (const segment of context) {
-      const result = detectInjection(segment.text, 0, trusted(segment.source) ? JAILBREAK_SIGNALS : undefined);
+      const result = this.#scan(segment);
       result.signals.forEach(s => signals.add(s));
       if (trusted(segment.source)) directScore = Math.max(directScore, result.score);
       else untrustedScore = Math.max(untrustedScore, result.score);
@@ -214,6 +222,17 @@ export class Firewall {
     if (rule) session.calls.set(rule.id, (session.calls.get(rule.id) ?? 0) + 1);
     if (forceApproval || score >= mandate.thresholds.approval) return finish('REQUIRE_APPROVAL', parsed, rule?.id);
     return finish('ALLOW', parsed, rule?.id);
+  }
+
+  #scan(segment: Segment): { score: number; signals: string[] } {
+    const key = sha256((trusted(segment.source) ? 't:' : 'u:') + segment.text);
+    let result = this.#scans.get(key);
+    if (!result) {
+      result = detectInjection(segment.text, 0, trusted(segment.source) ? JAILBREAK_SIGNALS : undefined);
+      this.#scans.set(key, result);
+      if (this.#scans.size > 1024) this.#scans.delete(this.#scans.keys().next().value!);
+    }
+    return result;
   }
 
   #record(verdict: Verdict, request: EvaluateRequest, parsed: ParsedAction | undefined, mandate: Mandate | undefined): Verdict {
@@ -300,8 +319,13 @@ export class Firewall {
     if (!payload || !mac || !safeEqual(hmac(this.#key, payload), mac)) return fail('INVALID_TOKEN');
     let claims: { a: string; d: string; m: string; s: string; e: number; n: string };
     try { claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')); } catch { return fail('INVALID_TOKEN'); }
+    if (typeof claims?.n !== 'string' || typeof claims.e !== 'number') return fail('INVALID_TOKEN');
     if (this.#nonces.has(claims.n)) return fail('TOKEN_REPLAY', claims.a);
-    this.#nonces.add(claims.n);
+    if (this.#nonces.size >= 10_000) {
+      const now = this.#clock().getTime();
+      for (const [nonce, expiry] of this.#nonces) if (expiry < now) this.#nonces.delete(nonce);
+    }
+    this.#nonces.set(claims.n, claims.e);
     if (this.#clock().getTime() > claims.e) return fail('TOKEN_EXPIRED', claims.a);
     const pending = this.#pending.get(claims.a);
     if (!pending || !pending.approved) return fail('NOT_AUTHORIZED', claims.a);

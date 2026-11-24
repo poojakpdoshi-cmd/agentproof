@@ -68,6 +68,10 @@ test('secret detection and redaction (synthetic credentials)', () => {
   assert.deepEqual(redactValue({ apiKey: 'plain-but-sensitive', nested: { note: FAKE.github } }),
     { apiKey: '[REDACTED:sensitive-field]', nested: { note: '[REDACTED:github-token]' } });
   assert.equal(findSecrets('card 4111 1111 1111 1112').length, 0, 'Luhn-invalid numbers are not cards');
+  for (const code of ['const token = v.decision;', 'secrets: number', 'token: fw.evaluate({', 'let password = getPassword(user);', 'apiKey = config.apiKey']) {
+    assert.deepEqual(findSecrets(code), [], code);
+  }
+  for (const env of ['API_TOKEN=abc123def456', 'password: "correct horse"', "client_secret='s3cr3t-value'"]) assert.equal(findSecrets(env).length, 1, env);
 });
 
 test('injection detector: obfuscations detected, ordinary text clean', () => {

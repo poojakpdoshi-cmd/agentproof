@@ -1,12 +1,81 @@
 # AgentProof
 
-AgentProof is a default-deny MCP security proxy plus a Red/Blue agent lab, built for the
-Diwali Festiverse **Security: Attack & Defend** track. A Red agent probes an
+**Intent-aware runtime firewall for AI agent tool calls.** AgentProof sits between an agent and
+its tools (MCP stdio proxy or library). It decides on every proposed call **before execution**:
+allow, block, or require human approval. It then binds the decision to the exact action that runs,
+verifies the output, and writes tamper-evident evidence. No LLM is needed to decide.
+
+```
+user intent → mandate ─┐
+agent proposes call ───┼─► contract ─► deny-by-default policy ─► provenance + taint + risk ─► ALLOW / BLOCK / REQUIRE_APPROVAL
+untrusted context ─────┘                                              (+ AgntID, most restrictive wins)
+            ALLOW ─► one-time token bound to action digest ─► execution ─► output verification ─► hash-chained evidence ─► dashboard
+```
+
+What makes it different: it asks **who chose the target**. A recipient, URL, path or command that
+appears only in untrusted content (tool output, web page, email, file, even base64-encoded) raises
+risk sharply. Session data-flow tracking stops protected content and seen credentials from leaving
+in outbound arguments, including encoded copies. See [COMPETITOR_ANALYSIS.md](COMPETITOR_ANALYSIS.md).
+
+## Quick start (offline, synthetic data, no keys)
+
+```sh
+npm ci --ignore-scripts --no-audit --no-fund
+npm test               # 157 tests
+npm run demo           # A/B: unprotected agent leaks a synthetic key; protected agent does not
+npm run dashboard      # http://127.0.0.1:8787/  (static copy: docs/demo/dashboard.html)
+npm run verify -- docs/demo/evidence.jsonl
+npm run benchmark:guard
+```
+
+Protect an MCP server with an intent mandate ([example](examples/demo-mandate.json)):
+
+```sh
+node src/mcp-proxy.ts --mandate examples/demo-mandate.json --evidence evidence.jsonl -- node examples/dummy-mcp-server.ts
+```
+
+Library use:
+
+```ts
+import { Firewall } from './src/guard/firewall.ts';
+const fw = new Firewall({ mandates: [mandate], executor });
+const v = fw.evaluate({ agent: 'report-agent', mandate: 'q3-summary', action: { tool: 'send_email', arguments },
+  context: [{ source: 'user', text: objective }, { source: 'file', text: documentTheAgentRead }] });
+if (v.decision === 'ALLOW') await fw.execute(v.token, { tool: 'send_email', arguments });
+```
+
+## Results (synthetic, self-authored; details in [BENCHMARK_RESULTS.md](BENCHMARK_RESULTS.md))
+
+| Blind holdout (38 scenarios) | Value |
+| --- | --- |
+| Attack detection | 95.8% (23/24); one miss documented |
+| False positives on legitimate actions | 0% (0/14) |
+| Deterministic-policy bypasses (all 125 scenarios) | 0/67 |
+| Evidence tamper detection (hash chain + HMAC + anchor) | 100% of 1,000 trials (70% with the hash chain alone) |
+| Concurrent token double-spends | 0 of 1,000 attempts |
+| Decision latency | p95 0.27 ms |
+
+## Documentation
+[ARCHITECTURE](ARCHITECTURE.md) · [THREAT_MODEL](THREAT_MODEL.md) · [SECURITY](SECURITY.md) ·
+[BENCHMARK_RESULTS](BENCHMARK_RESULTS.md) · [COMPETITOR_ANALYSIS](COMPETITOR_ANALYSIS.md) ·
+[AGNTID_INTEGRATION](AGNTID_INTEGRATION.md) · [HACKATHON_DEMO](HACKATHON_DEMO.md) ·
+[JUDGES_PITCH](JUDGES_PITCH.md) · [PROJECT_STATUS](PROJECT_STATUS.md)
+
+**AgntID:** the adapter follows the official `agntid-python` SDK contract and is tested against a
+labelled **mock** runtime only. A live run needs organizer-provided access ([details](AGNTID_INTEGRATION.md)).
+**Not a sandbox:** AgentProof intercepts requests; a tool reachable directly bypasses it.
+
+---
+
+## Red/Blue agent lab and original policy proxy (Phases 0–6)
+
+The original default-deny MCP proxy (`--policy` mode) and Red/Blue agent lab below are unchanged.
+They were built for the Diwali Festiverse **Security: Attack & Defend** track. A Red agent probes an
 agent's tool permissions through a real MCP proxy and hands its findings to a Blue
 agent over BAND. Blue independently reproduces the findings, proposes a narrower
 policy, and proves the fix by retesting through the same proxy.
 
-## Try it offline (no keys, no network, about 3 s)
+### Try the lab offline (no keys, no network, about 3 s)
 
 ```sh
 npm ci --ignore-scripts --no-audit --no-fund
@@ -24,6 +93,8 @@ npm test
 | Gemini adapter ([Phase 4.2](docs/phase4.2.md)) | verified with mocked HTTP only |
 | Full offline chain Gemini adapter → BAND → MCP retest ([Phase 4.3](docs/phase4.3.md)) | verified offline, reproducible ([evidence](docs/phase4.3-e2e.json)) |
 | Autonomous live Gemini → BAND → retest | **unverified**; requires an authorized operator |
+| Guard pipeline, `--mandate` proxy mode, demo, dashboard, benchmark | verified offline (`npm test`, `npm run demo`, `npm run benchmark:guard`) |
+| AgntID Runtime integration | adapter verified against a **mock** only; live run **unverified** |
 
 In the offline demo, provider replies are scripted and BAND delivery uses the SDK's
 `FakeAgentTools`. No result above is live AI output. The lab's `private/` overgrant
@@ -200,6 +271,10 @@ outside scope. Do not attach real data or tools.
 
 ## Layout and development
 
+- `src/guard/`: intent mandates, tool contracts, provenance/taint, injection signals, risk, firewall, evidence ledger, MCP guard adapter.
+- `src/integrations/agntid.ts`: AgntID Runtime adapter (tested against `test/fixtures/mock-agntid-runtime.ts` only).
+- `src/dashboard/`: read-only dashboard server, summary model and static export; `src/verify-evidence.ts`: verifier CLI.
+- `demo/attack-demo.ts`: offline A/B demo; `benchmarks/guard.ts` + `benchmarks/guard/`: 125-scenario benchmark.
 - `src/paths.ts`: portable path validation and canonicalization.
 - `src/policy.ts`: grant validation and matching.
 - `src/simulator.ts`: in-memory actions and immutable decision records.

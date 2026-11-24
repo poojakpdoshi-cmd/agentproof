@@ -3963,20 +3963,20 @@
   "performance": {
     "perScenarioDecisionMs": {
       "samples": 3750,
-      "p50": 0.174,
-      "p95": 0.299,
-      "p99": 0.835,
-      "max": 4.65
+      "p50": 0.153,
+      "p95": 0.273,
+      "p99": 0.683,
+      "max": 4.047
     },
     "sustained10kDecisionsMs": {
-      "p50": 0.109,
-      "p95": 0.226,
-      "p99": 0.42
+      "p50": 0.077,
+      "p95": 0.132,
+      "p99": 0.315
     },
     "memory": {
       "gcExposed": true,
-      "heapUsedDeltaMiB": 19.697,
-      "rssMiB": 143.129,
+      "heapUsedDeltaMiB": 19.7,
+      "rssMiB": 144.965,
       "ledgerEntriesHeld": 10007,
       "note": "Delta includes 10k in-memory evidence entries retained by the ledger."
     }

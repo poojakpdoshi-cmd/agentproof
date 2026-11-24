@@ -23,8 +23,11 @@ const DETECTORS: Array<{ type: string; pattern: RegExp; accept?: (match: string)
   { type: 'jwt', pattern: /\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g },
   { type: 'bearer-token', pattern: /\bBearer\s+[A-Za-z0-9._~+/-]{16,}=*/gi },
   { type: 'connection-string', pattern: /\b[a-z][a-z0-9+.-]{1,20}:\/\/[^\s:@/]{1,100}:[^\s@/]{3,200}@[^\s'"]{1,300}/gi },
+  // Quoted values, or unquoted values of 8+ credential characters containing a digit. Code such
+  // as `token = v.decision` or `secrets: number` must not count as a credential.
   { type: 'credential-assignment',
-    pattern: /\b[A-Za-z0-9_.-]{0,40}(?:password|passwd|pwd|secret|token|api[_-]?key|private[_-]?key|access[_-]?key|client[_-]?secret)[A-Za-z0-9_.-]{0,40}["']?\s*[:=]\s*["']?[^\s"',;]{6,}/gi },
+    pattern: /\b[A-Za-z0-9_.-]{0,40}(?:password|passwd|pwd|secret|token|api[_-]?key|private[_-]?key|access[_-]?key|client[_-]?secret)[A-Za-z0-9_.-]{0,40}["']?\s*[:=]\s*(?:"[^"\n]{6,200}"|'[^'\n]{6,200}'|[A-Za-z0-9_\-+/=!@#$%^&*~]{8,200}(?![A-Za-z0-9_\-+/=!@#$%^&*~.(]))/gi,
+    accept: match => /["']/.test(match.slice(match.search(/[:=]/))) || /\d/.test(match.slice(match.search(/[:=]/))) },
   { type: 'us-ssn', pattern: /\b\d{3}-\d{2}-\d{4}\b/g },
   { type: 'payment-card', pattern: /\b\d(?:[ -]?\d){12,18}\b/g, accept: match => luhn(match.replace(/\D/g, '')) },
 ];
