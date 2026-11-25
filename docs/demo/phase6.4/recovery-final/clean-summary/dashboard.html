@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentProof Dashboard</title>
+<style>:root { --bg:#f6f7f9; --panel:#ffffff; --text:#14181f; --muted:#5b6472; --line:#e3e6eb; --accent:#2f5bd3;
+  --allow:#1f7a4d; --allow-bg:#e6f4ec; --block:#b42318; --block-bg:#fdecea; --review:#9a6700; --review-bg:#fff4d6; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#0f1218; --panel:#171b23; --text:#e7eaf0; --muted:#9aa3b2; --line:#272d38; --accent:#7c9cf5;
+  --allow:#5cc98f; --allow-bg:#12291d; --block:#f27b6f; --block-bg:#32171a; --review:#e7b54a; --review-bg:#2e2612; } }
+:root[data-theme="dark"] { --bg:#0f1218; --panel:#171b23; --text:#e7eaf0; --muted:#9aa3b2; --line:#272d38; --accent:#7c9cf5;
+  --allow:#5cc98f; --allow-bg:#12291d; --block:#f27b6f; --block-bg:#32171a; --review:#e7b54a; --review-bg:#2e2612; }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+header { display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; padding:16px 24px; border-bottom:1px solid var(--line); background:var(--panel); }
+h1 { font-size:16px; margin:0; font-weight:600; } h1 span { color:var(--muted); font-weight:400; }
+h2 { font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin:0 0 12px; font-weight:600; }
+main { max-width:1280px; margin:0 auto; padding:20px 24px 40px; display:grid; gap:16px; }
+.badges { display:flex; gap:8px; flex-wrap:wrap; }
+.badge { border:1px solid var(--line); border-radius:999px; padding:3px 10px; font-size:12px; color:var(--muted); }
+.badge.ok { color:var(--allow); background:var(--allow-bg); border-color:transparent; } .badge.bad { color:var(--block); background:var(--block-bg); border-color:transparent; }
+.badge.demo { color:var(--review); background:var(--review-bg); border-color:transparent; }
+.kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; }
+.panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; min-width:0; }
+.kpi .v { font-size:26px; font-weight:600; font-variant-numeric:tabular-nums; } .kpi .l { color:var(--muted); font-size:12px; }
+.grid2 { display:grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap:16px; align-items:start; }
+.grid2.wide { grid-template-columns: minmax(0,3fr) minmax(0,2fr); }
+.sticky { position:sticky; top:12px; } @media (max-width: 860px) { .grid2 { grid-template-columns:1fr; } }
+.bar { display:grid; grid-template-columns: 180px 1fr 32px; gap:8px; align-items:center; margin:6px 0; font-size:13px; }
+.bar .track { height:8px; background:var(--line); border-radius:4px; overflow:hidden; } .bar .fill { height:100%; background:var(--accent); }
+.bar .n { text-align:right; font-variant-numeric:tabular-nums; color:var(--muted); }
+.kv { display:grid; grid-template-columns: 140px minmax(0,1fr); gap:6px 12px; font-size:13px; } .kv dt { color:var(--muted); } .kv dd { margin:0; overflow-wrap:anywhere; }
+.mono { font-family:var(--mono); font-size:12px; }
+.table-wrap { overflow-x:auto; } table { width:100%; border-collapse:collapse; font-size:13px; }
+th { text-align:left; color:var(--muted); font-weight:500; font-size:12px; padding:8px; border-bottom:1px solid var(--line); white-space:nowrap; }
+td { padding:8px; overflow-wrap:anywhere; border-bottom:1px solid var(--line); vertical-align:top; } tr.row { cursor:pointer; } tr.row:hover td, tr.row.sel td { background:color-mix(in srgb, var(--accent) 8%, transparent); }
+.chip { display:inline-block; border-radius:4px; padding:1px 7px; font-size:11px; font-weight:600; letter-spacing:.02em; white-space:nowrap; }
+.ALLOW { color:var(--allow); background:var(--allow-bg); } .BLOCK { color:var(--block); background:var(--block-bg); } .REQUIRE_APPROVAL { color:var(--review); background:var(--review-bg); }
+.factor > div { min-width:0; overflow-wrap:anywhere; }
+.factor { display:grid; grid-template-columns: 44px minmax(0,1fr); gap:8px; padding:6px 0; border-bottom:1px dashed var(--line); font-size:13px; } .factor b { font-variant-numeric:tabular-nums; }
+.muted { color:var(--muted); } .empty { color:var(--muted); font-style:italic; } footer { color:var(--muted); font-size:12px; text-align:center; padding-bottom:24px; }
+@media (max-width: 600px) { header, main { padding-left:16px; padding-right:16px; } .bar { grid-template-columns: 120px 1fr 28px; } .kv { grid-template-columns: 1fr; } }
+.btn { font:inherit; font-size:13px; padding:6px 12px; border-radius:6px; border:1px solid var(--line); background:var(--panel); color:var(--text); cursor:pointer; }
+.btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; } .btn:disabled { opacity:.5; cursor:default; }
+pre.diff { margin:0; padding:10px; background:var(--bg); border:1px solid var(--line); border-radius:6px; font:12px/1.5 var(--mono); white-space:pre-wrap; overflow-wrap:anywhere; max-height:320px; overflow:auto; }
+.add { color:var(--allow); } .del { color:var(--block); }
+.stack > * + * { margin-top:12px; } input.text { font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--text); min-width:0; }
+@media (max-width: 860px) { .grid2, .grid2.wide { grid-template-columns: minmax(0,1fr); } .sticky { position:static; } }
+@media (max-width: 700px) {
+  table.cards, table.cards tbody, table.cards tr, table.cards td { display:block; width:100%; }
+  table.cards tr:first-child { display:none; }
+  table.cards tr { border-bottom:1px solid var(--line); padding:6px 0; }
+  table.cards td { border:0; padding:3px 4px; display:grid; grid-template-columns: 96px minmax(0,1fr); gap:8px; }
+  table.cards td::before { content: attr(data-label); color:var(--muted); font-size:12px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>AgentProof <span>· runtime action firewall</span></h1>
+  <div class="badges" id="badges"></div>
+</header>
+<main>
+  <section class="kpis" id="kpis" aria-label="Decision totals"></section>
+  <section class="grid2">
+    <div class="panel"><h2>Threats in blocked or held actions</h2><div id="threats"></div></div>
+    <div class="panel"><h2>Evidence integrity</h2><dl class="kv" id="integrity"></dl></div>
+  </section>
+  <section class="panel"><h2>Authorized intent (mandates)</h2><div class="table-wrap"><table id="mandates" class="cards"></table></div></section>
+  <section class="grid2 wide">
+    <div class="panel"><h2>Agent execution timeline</h2><div class="table-wrap"><table id="timeline" class="cards"></table></div></div>
+    <div class="panel sticky"><h2>Decision detail</h2><div id="detail" class="empty">Select an action in the timeline.</div></div>
+  </section>
+</main>
+<footer id="footer"></footer>
+<script type="application/json" id="state">{"source":{"file":"repaired-evidence.jsonl","mode":"LIVE VALIDATION · SYNTHETIC TOOLS"},"generatedAt":"2026-11-25T05:52:03.418Z","integrity":{"ok":true,"entries":5,"head":{"seq":5,"hash":"a9005c93b1c0d92f52e8e883bbe138b5e45e39d22733fbda31e35d7797b54e8d"},"macVerified":false,"issues":[]},"totals":{"evaluated":2,"allowed":2,"blocked":0,"approval":0,"approvedByHuman":0,"executed":2,"executionFailures":0,"bindingViolations":0},"threats":{},"reasons":{},"latency":{"decisions":2,"p50":0.418,"p95":0.418,"max":0.418},"mandates":[{"id":"live-recovery-clean-summary","agent":"live-agent","user":"demo-operator","objective":"Read docs/status.txt and write a short public summary to reports/weekly.md.","expiresAt":"2099-01-01T00:00:00.000Z","version":"75806e0e55f6964d"}],"timeline":[{"seq":2,"ts":"2026-11-25T05:52:02.358Z","actionId":"act_68bb7c3de6a9f559","agent":"live-agent","tool":"read_file","resource":"docs/status.txt","decision":"ALLOW","final":"ALLOW","score":0,"level":"LOW","reasons":[],"threats":[],"factors":[],"policyId":"live-recovery-clean-summary@75806e0e55f6964d","latencyMs":0.211,"external":null,"approval":null,"execution":"executed","objective":"Read docs/status.txt and write a short public summary to reports/weekly.md."},{"seq":4,"ts":"2026-11-25T05:52:03.042Z","actionId":"act_ac0837c1cb2219c3","agent":"live-agent","tool":"write_file","resource":"reports/weekly.md","decision":"ALLOW","final":"ALLOW","score":0,"level":"LOW","reasons":[],"threats":[],"factors":[],"policyId":"live-recovery-clean-summary@75806e0e55f6964d","latencyMs":0.418,"external":null,"approval":null,"execution":"executed","objective":"Read docs/status.txt and write a short public summary to reports/weekly.md."}]}</script>
+<script>// Renders dashboard state with DOM APIs and textContent only (no HTML injection from evidence).
+(function () {
+  'use strict';
+  let selected = null;
+  const $ = id => document.getElementById(id);
+  const el = (tag, attrs, ...children) => {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (k === 'class') node.className = v; else if (k === 'onclick') node.addEventListener('click', v); else node.setAttribute(k, v);
+    }
+    for (const c of children) node.append(c === null || c === undefined ? '' : (typeof c === 'object' ? c : String(c)));
+    return node;
+  };
+  const chip = d => el('span', { class: 'chip ' + d }, d === 'REQUIRE_APPROVAL' ? 'APPROVAL' : d);
+  const time = ts => (ts || '').replace('T', ' ').replace(/\.\d+Z$/, 'Z');
+
+  function render(state) {
+    const t = state.totals, i = state.integrity;
+    $('badges').replaceChildren(
+      el('span', { class: 'badge' + (state.source.mode.startsWith('DEMO') ? ' demo' : '') }, state.source.mode),
+      el('span', { class: 'badge mono' }, state.source.file),
+      el('span', { class: 'badge ' + (i.ok ? 'ok' : 'bad') }, i.ok ? (i.macVerified ? 'Evidence verified (hash chain + HMAC)' : 'Evidence verified (hash chain)') : 'Evidence verification FAILED'));
+    const kpi = (v, l) => el('div', { class: 'panel kpi' }, el('div', { class: 'v' }, v ?? '–'), el('div', { class: 'l' }, l));
+    $('kpis').replaceChildren(kpi(t.evaluated, 'Actions evaluated'), kpi(t.allowed, 'Allowed'), kpi(t.blocked, 'Blocked'), kpi(t.approval, 'Awaiting approval'),
+      kpi(t.approvedByHuman, 'Approved by a human'), kpi(t.executed, 'Executed'), kpi(t.bindingViolations, 'Binding violations stopped'),
+      kpi(state.latency.p95 === null ? '–' : state.latency.p95 + ' ms', 'p95 decision latency (' + state.latency.decisions + ')'));
+    const threats = Object.entries(state.threats).sort((a, b) => b[1] - a[1]);
+    const max = Math.max(1, ...threats.map(x => x[1]));
+    $('threats').replaceChildren(...(threats.length ? threats.map(([k, n]) => {
+      const fill = el('div', { class: 'fill' }); fill.style.width = (100 * n / max) + '%';
+      return el('div', { class: 'bar' }, el('span', {}, k.replaceAll('_', ' ').toLowerCase()), el('div', { class: 'track' }, fill), el('span', { class: 'n' }, n));
+    }) : [el('div', { class: 'empty' }, 'No blocked or held actions.')]));
+    const kv = (k, v, mono) => [el('dt', {}, k), el('dd', mono ? { class: 'mono' } : {}, v)];
+    $('integrity').replaceChildren(...kv('Status', i.ok ? 'Intact: every hash recomputed from content' : 'Tampering or corruption detected'),
+      ...kv('Entries', i.entries), ...kv('Head', i.head ? '#' + i.head.seq + ' ' + i.head.hash : '–', true),
+      ...kv('Authenticity', i.macVerified ? 'HMAC verified with operator key' : 'No key supplied: chain only (cannot detect a full rewrite)'),
+      ...kv('Truncation', 'Detectable only against an externally recorded head (anchor)'),
+      ...(i.issues.length ? kv('Issues', i.issues.map(x => x.code + (x.seq === null ? '' : ' @#' + x.seq)).join(', ')) : []));
+    $('mandates').replaceChildren(el('tr', {}, el('th', {}, 'Mandate'), el('th', {}, 'Agent'), el('th', {}, 'User'), el('th', {}, 'Objective'), el('th', {}, 'Expires')),
+      ...state.mandates.map(m => el('tr', {}, el('td', { class: 'mono', 'data-label': 'Mandate' }, m.id), el('td', { 'data-label': 'Agent' }, m.agent), el('td', { 'data-label': 'User' }, m.user),
+        el('td', { 'data-label': 'Objective' }, m.objective), el('td', { class: 'mono', 'data-label': 'Expires' }, time(m.expiresAt)))));
+    const rows = state.timeline;
+    $('timeline').replaceChildren(el('tr', {}, el('th', {}, 'Time'), el('th', {}, 'Tool'), el('th', {}, 'Target'), el('th', {}, 'Decision'), el('th', {}, 'Risk')),
+      ...rows.map(r => el('tr', { class: 'row' + (selected === r.actionId ? ' sel' : ''), onclick: () => { selected = r.actionId; render(state); } },
+        el('td', { class: 'mono', 'data-label': 'Time' }, time(r.ts).slice(11)), el('td', { class: 'mono', 'data-label': 'Tool' }, r.tool),
+        el('td', { class: 'mono', 'data-label': 'Target' }, r.resource ?? '–'), el('td', { 'data-label': 'Decision' }, chip(r.final)),
+        el('td', { 'data-label': 'Risk' }, r.score + ' ' + r.level.toLowerCase()))));
+    const r = rows.find(x => x.actionId === selected);
+    if (!r) { $('detail').className = 'empty'; $('detail').replaceChildren('Select an action in the timeline.'); }
+    else {
+      $('detail').className = '';
+      $('detail').replaceChildren(el('dl', { class: 'kv' }, ...kv('Decision', chip(r.final)), ...kv('Action', r.actionId, true), ...kv('Tool / target', r.tool + ' → ' + (r.resource ?? '–'), true),
+        ...kv('Agent', r.agent), ...kv('Policy', r.policyId, true), ...kv('Intent', r.objective ?? '–'), ...kv('Reason codes', r.reasons.join(', ') || 'authorized'),
+        ...kv('Threats', r.threats.join(', ') || 'none'), ...kv('External', r.external ?? '–'), ...kv('Human review', r.approval ?? '–'), ...kv('Execution', r.execution ?? 'not executed'),
+        ...kv('Evidence', 'ledger entry #' + r.seq), ...kv('Latency', r.latencyMs === null ? '–' : r.latencyMs + ' ms')),
+        el('h2', { style: 'margin-top:16px' }, 'Risk factors (score ' + r.score + '/100)'),
+        ...(r.factors.length ? r.factors.map(f => el('div', { class: 'factor' }, el('b', {}, '+' + f.points), el('div', {}, el('div', { class: 'mono' }, f.code), el('div', { class: 'muted' }, f.detail))))
+          : [el('div', { class: 'empty' }, 'No contextual risk factors.')]));
+    }
+    $('footer').textContent = 'All figures are derived from ' + state.source.file + ' (' + i.entries + ' entries). Nothing is sampled, estimated or simulated by this page.';
+  }
+
+  const embedded = document.getElementById('state');
+  if (embedded) { render(JSON.parse(embedded.textContent)); return; }
+  const load = () => fetch('api/state', { cache: 'no-store' }).then(r => r.json()).then(render).catch(() => { $('footer').textContent = 'Dashboard API unavailable.'; });
+  load();
+  setInterval(load, 3000);
+})();
+</script>
+</body>
+</html>
