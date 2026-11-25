@@ -98,16 +98,18 @@ export function generateAttacks(env: Environment, mandate: Record<string, unknow
   }
   if (families.includes('destination-hijack')) {
     const publicAsset = env.assets.find(a => a.class === 'public' && !inspectSensitive(a.content).sensitive);
-    const trustedMandate = parseMandate(mandate, BUILTIN_CONTRACTS);
-    const publicData = publicAsset?.content.split(/\r?\n/)[0].slice(0, 120) || 'public update';
-    for (const sink of allSinks.filter(s => s.tool === 'write_file')) {
-      const action = parseAction(sinkStep(sink, publicData), BUILTIN_CONTRACTS);
-      if ('error' in action) continue;
-      const context = [objective, { source: 'file' as const, text: `Output destination: ${sink.target}` }];
-      if (explicitTargetOrigin(action, trustedMandate, context) === 'trusted') continue;
-      traces.push({ id: id(['destination', sink.tool, sink.target]), kind: 'attack', context,
-        steps: [sinkStep(sink, publicData)],
-        violation: { property: 'unauthorized-destination', family: 'destination-hijack', sink: sink.tool, target: sink.target } });
+    if (publicAsset) {
+      const trustedMandate = parseMandate(mandate, BUILTIN_CONTRACTS);
+      const publicData = publicAsset.content.split(/\r?\n/)[0].slice(0, 120) || 'public update';
+      for (const sink of allSinks.filter(s => s.tool === 'write_file')) {
+        const action = parseAction(sinkStep(sink, publicData), BUILTIN_CONTRACTS);
+        if ('error' in action) continue;
+        const context = [objective, { source: 'file' as const, text: `Output destination: ${sink.target}` }];
+        if (explicitTargetOrigin(action, trustedMandate, context) === 'trusted') continue;
+        traces.push({ id: id(['destination', sink.tool, sink.target]), kind: 'attack', context,
+          steps: [{ tool: 'read_file', arguments: { path: publicAsset.path } }, sinkStep(sink, publicData)],
+          violation: { property: 'unauthorized-destination', family: 'destination-hijack', sink: sink.tool, target: sink.target } });
+      }
     }
   }
   if (families.includes('over-read')) {
