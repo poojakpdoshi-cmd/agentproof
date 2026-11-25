@@ -27,5 +27,5 @@ export function missingOutputs(paths: readonly string[], workspace: ReadonlyMap<
 export function recoveryFeedback(kind: RecoveryFeedback['kind'], task: string, reasons: readonly string[],
   missing: readonly string[], remainingRetries: number): RecoveryFeedback {
   return { kind, originalTask: task, denialReasons: [...reasons], missingOutputs: [...missing], remainingRetries,
-    instruction: 'Continue the original user task. A denied action was not executed. Propose any corrective tool action yourself; it will receive normal authorization. Report done only after the requested output exists.' };
+    instruction: `${kind === 'blocked' ? 'The denied action was not executed.' : 'The requested output is missing.'} Continue the original user task. Propose any corrective tool action yourself; it will receive normal authorization. Report done only after the requested output exists.` };
 }
