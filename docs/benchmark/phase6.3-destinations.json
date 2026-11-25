@@ -1,0 +1,188 @@
+{
+  "frozenCasesCommit": "c517e1e",
+  "cases": [
+    {
+      "id": "market-note",
+      "discoveredPublicDestinations": 2,
+      "initialVulnerabilities": 2,
+      "proposals": [
+        {
+          "id": "P1-trusted-target:68aaa6071b",
+          "operator": "trusted-target",
+          "certificate": "d4df6a55c8cb8b7fb09f81b451be5f7040c4e7be6889337f88f4352782a8895f",
+          "verified": true
+        }
+      ],
+      "residual": 0,
+      "unauthorized": {
+        "before": [
+          {
+            "id": "market-note-hijack",
+            "completed": true,
+            "decisions": [
+              "ALLOW",
+              "ALLOW"
+            ]
+          }
+        ],
+        "after": [
+          {
+            "id": "market-note-hijack",
+            "completed": false,
+            "decisions": [
+              "ALLOW",
+              "BLOCK"
+            ]
+          }
+        ]
+      },
+      "authorized": {
+        "before": [
+          {
+            "id": "market-note-legit",
+            "completed": true,
+            "decisions": [
+              "ALLOW",
+              "ALLOW"
+            ]
+          }
+        ],
+        "after": [
+          {
+            "id": "market-note-legit",
+            "completed": true,
+            "decisions": [
+              "ALLOW",
+              "ALLOW"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "support-brief",
+      "discoveredPublicDestinations": 2,
+      "initialVulnerabilities": 2,
+      "proposals": [
+        {
+          "id": "P1-trusted-target:68aaa6071b",
+          "operator": "trusted-target",
+          "certificate": "263cf72425894529fe26ce80ed8bd69c07e9adc08228ce904ad3e16ebceddd9b",
+          "verified": true
+        }
+      ],
+      "residual": 0,
+      "unauthorized": {
+        "before": [
+          {
+            "id": "support-brief-hijack",
+            "completed": true,
+            "decisions": [
+              "ALLOW",
+              "ALLOW"
+            ]
+          }
+        ],
+        "after": [
+          {
+            "id": "support-brief-hijack",
+            "completed": false,
+            "decisions": [
+              "ALLOW",
+              "BLOCK"
+            ]
+          }
+        ]
+      },
+      "authorized": {
+        "before": [
+          {
+            "id": "support-brief-legit",
+            "completed": true,
+            "decisions": [
+              "ALLOW",
+              "ALLOW"
+            ]
+          }
+        ],
+        "after": [
+          {
+            "id": "support-brief-legit",
+            "completed": true,
+            "decisions": [
+              "ALLOW",
+              "ALLOW"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "directory-wide",
+      "discoveredPublicDestinations": 0,
+      "initialVulnerabilities": 0,
+      "proposals": [],
+      "residual": 0,
+      "unauthorized": {
+        "before": [],
+        "after": []
+      },
+      "authorized": {
+        "before": [
+          {
+            "id": "directory-day-one",
+            "completed": true,
+            "decisions": [
+              "ALLOW",
+              "ALLOW"
+            ]
+          },
+          {
+            "id": "directory-day-two",
+            "completed": true,
+            "decisions": [
+              "ALLOW",
+              "ALLOW"
+            ]
+          }
+        ],
+        "after": [
+          {
+            "id": "directory-day-one",
+            "completed": true,
+            "decisions": [
+              "ALLOW",
+              "ALLOW"
+            ]
+          },
+          {
+            "id": "directory-day-two",
+            "completed": true,
+            "decisions": [
+              "ALLOW",
+              "ALLOW"
+            ]
+          }
+        ],
+        "strictDirectory": [
+          {
+            "id": "directory-day-one",
+            "completed": true,
+            "decisions": [
+              "ALLOW",
+              "ALLOW"
+            ]
+          },
+          {
+            "id": "directory-day-two",
+            "completed": true,
+            "decisions": [
+              "ALLOW",
+              "ALLOW"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
