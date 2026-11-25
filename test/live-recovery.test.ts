@@ -13,7 +13,8 @@ function scripted(responses: unknown[]) {
   let index = 0;
   const agent = new LocalAgent('mock', async (_url, init) => {
     const request = JSON.parse(String(init?.body));
-    feedback.push(JSON.parse(request.messages[1].content).feedback);
+    const notice = request.messages.find((message: { content: string }) => message.content.startsWith('Trusted runtime recovery notice: '));
+    feedback.push(notice ? JSON.parse(notice.content.slice('Trusted runtime recovery notice: '.length)) : undefined);
     const response = responses[index++];
     assert.notEqual(response, undefined, 'unexpected model call');
     return new Response(JSON.stringify({ message: { content: JSON.stringify(response) } }), { status: 200 });
