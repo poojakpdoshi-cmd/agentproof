@@ -1,5 +1,7 @@
 # AgntID integration
 
+Phase 7 rechecked the official event and current SDK setup; see [live readiness](PHASE7_AGNTID_READINESS.md). The access observations below are historical.
+
 **Status: adapter implemented and tested against a local MOCK runtime only. Not verified against
 a live AgntID Runtime.** No AgntID decision in this repository is real AgntID output.
 

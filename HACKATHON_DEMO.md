@@ -1,5 +1,7 @@
 # Hackathon demo (3 minutes, fully offline)
 
+This is an offline rehearsal, not a competition-ready AgntID demonstration. See [Phase 7 live readiness](PHASE7_AGNTID_READINESS.md) for the official requirements and current access blocker.
+
 Labels to keep on screen: **SCRIPTED AGENT (deterministic, NOT AI)** · **SYNTHETIC DATA, IN-MEMORY
 TOOLS** · **AgntID: MOCK RUNTIME** (only if showing the adapter).
 
