@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 // Live-only starter smoke. No mock fallback and no model-provider call.
 import { AgntidError, AgntidRuntime, connectRuntime } from '../src/integrations/agntid.ts';
+import type { AgntidDecision } from '../src/integrations/agntid.ts';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Firewall } from '../src/guard/firewall.ts';
 import type { Contract } from '../src/guard/contracts.ts';
 import { verifyLedger } from '../src/guard/ledger.ts';
@@ -11,6 +16,8 @@ import { env } from './live-env.ts';
 const url = process.env.AGNTID_MCP_URL;
 const agentId = process.env.AGNTID_AGENT_ID;
 const userId = process.env.AGNTID_USER_ID;
+const outIndex = process.argv.indexOf('--out');
+const out = outIndex >= 0 && process.argv[outIndex + 1] ? path.resolve(process.argv[outIndex + 1]) : undefined;
 if (!url || !agentId || !userId) {
   console.error('Set AGNTID_MCP_URL, AGNTID_AGENT_ID and AGNTID_USER_ID for a registered live runtime. See PHASE7_AGNTID_READINESS.md.');
   process.exit(2);
@@ -43,33 +50,55 @@ async function main() {
     if (!task.ok || !task.intentPrepared || !task.relevantTools?.includes('demo_add_numbers')) {
       throw new Error(`AgntID task intent unavailable: ${task.reason || task.intentReason || 'starter tool not shortlisted'}`);
     }
-    let runtimeDecision: string | null = null;
+    let runtimeDecision: Pick<AgntidDecision, 'outcome' | 'code' | 'policyName' | 'correlationId'> | null = null;
+    const summarize = (decision: AgntidDecision) => ({ outcome: decision.outcome, code: decision.code,
+      policyName: decision.policyName, correlationId: decision.correlationId });
     const firewall = new Firewall({ mandates: [mandate], contracts: { demo_add_numbers: contract },
       authorizer: runtime.authorizer(), executor: { name: 'agntid-starter', execute: async proposed => {
         // `target` is the local reviewed contract resource; only the official tool schema reaches AgntID.
         try {
           const call = await runtime.callTool({ tool: proposed.tool,
             arguments: { first_number: proposed.arguments.first_number, second_number: proposed.arguments.second_number } });
-          runtimeDecision = call.decision?.outcome ?? null;
+          runtimeDecision = call.decision ? summarize(call.decision) : null;
           if (!call.decision) throw new AgntidError('AUTHZ_UNAVAILABLE', { reason: 'missing structured runtime decision' });
           return call.result;
         } catch (error) {
-          if (error instanceof AgntidError && typeof error.details.outcome === 'string') runtimeDecision = error.details.outcome;
+          if (error instanceof AgntidError && typeof error.details.outcome === 'string') {
+            runtimeDecision = { outcome: error.details.outcome as AgntidDecision['outcome'],
+              code: String(error.details.code ?? ''), policyName: String(error.details.policyName ?? ''),
+              correlationId: String(error.details.correlationId ?? '') };
+          }
           throw error;
         }
       } } });
     const verdict = await firewall.decide({ agent: agentId!, mandate: mandate.id, action,
       context: [{ source: 'user', text: objective }] });
     const executed = verdict.token ? await firewall.execute(verdict.token, action) : null;
+    const observedDecision = runtimeDecision as Pick<AgntidDecision, 'outcome' | 'code' | 'policyName' | 'correlationId'> | null;
     const returnedText = executed?.ok ? JSON.stringify(executed.output) : '';
+    let dashboardExported: boolean | null = null;
+    if (out) {
+      mkdirSync(out, { recursive: true });
+      const evidence = path.join(out, 'evidence.jsonl');
+      writeFileSync(evidence, firewall.ledger.toJsonl());
+      writeFileSync(path.join(out, 'certificates.json'), JSON.stringify(report.proposals.map(p => p.certificate), null, 2) + '\n');
+      const dashboard = spawnSync(process.execPath,
+        [fileURLToPath(new URL('../src/dashboard/server.ts', import.meta.url)), '--evidence', evidence,
+          '--export', path.join(out, 'dashboard.html'), '--mode', 'LIVE AGNTID RUNTIME'], { encoding: 'utf8' });
+      dashboardExported = dashboard.status === 0;
+    }
     const result = { kind: 'LIVE AGNTID RUNTIME', discovery: { initialVulnerabilities: report.initialVulnerabilities,
       proposals: report.proposals.length, certificateDigests: report.proposals.map(p => p.certificate.digest), certificatesVerified, residual: report.residual.length,
       attackBefore, attackAfter, legitimateAfter, discoveryVerified },
-    agntid: { taskPrepared: task.intentPrepared, relevantTool: true, localDecision: verdict.decision,
-      runtimeDecision, execution: executed?.ok ? 'ok' : executed?.code ?? 'not attempted',
-      sum33Observed: /\b33\b/.test(returnedText), evidenceVerified: verifyLedger(firewall.ledger.entries).ok } };
+    agntid: { taskId: runtime.taskId, intentSnapshot: task.snapshotId, taskPrepared: task.intentPrepared,
+      relevantTool: true, localDecision: verdict.decision, localReasons: verdict.reasons,
+      runtimeDecision: observedDecision, execution: executed?.ok ? 'ok' : executed?.code ?? 'not attempted',
+      sum33Observed: /\b33\b/.test(returnedText), evidenceVerified: verifyLedger(firewall.ledger.entries).ok,
+      dashboardExported } };
     console.log(JSON.stringify(result, null, 2));
-    if (!discoveryVerified || !executed?.ok || runtimeDecision !== 'allow' || !result.agntid.sum33Observed) process.exitCode = 1;
+    if (out) writeFileSync(path.join(out, 'result.json'), JSON.stringify(result, null, 2) + '\n');
+    if (!discoveryVerified || !executed?.ok || observedDecision?.outcome !== 'allow' || !result.agntid.sum33Observed
+      || dashboardExported === false) process.exitCode = 1;
   } finally {
     await runtime.closeTask();
     await caller.close();
