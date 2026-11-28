@@ -34,7 +34,7 @@ function extractJson(text: string): Record<string, unknown> | null {
   }
   return null;
 }
-function payloadOf(result: unknown): Record<string, unknown> | null {
+export function payloadOf(result: unknown): Record<string, unknown> | null {
   if (!result || typeof result !== 'object') return null;
   const r = result as ToolResult;
   if (r.structuredContent && typeof r.structuredContent === 'object' && !Array.isArray(r.structuredContent)) return r.structuredContent as Record<string, unknown>;
