@@ -52,6 +52,25 @@ const view = (d: AgntidDecision | null) => d && ({ outcome: d.outcome, allowed: 
   reason: sanitize(d.reason) });
 const textOf = (r: unknown) => sanitize(JSON.stringify(r ?? null), 400);
 
+// Compact, sanitized view of the Runtime's __agntid_execution_flow (correlation id, stage verdicts, answer).
+export function flowOf(raw: unknown) {
+  const texts: string[] = [];
+  if (typeof raw === 'string') texts.push(raw);
+  else if (raw && typeof raw === 'object') for (const b of ((raw as { content?: unknown[] }).content ?? [])) { const t = (b as { text?: unknown })?.text; if (typeof t === 'string') texts.push(t); }
+  for (const t of texts) {
+    if (!t.includes('__agntid_execution_flow')) continue;
+    let j: Record<string, any>; try { j = JSON.parse(t.slice(t.indexOf('{'))); } catch { continue; }
+    const fl = j.__agntid_execution_flow ?? {}; const step = (n: string) => (fl.steps ?? []).find((x: any) => x.step === n)?.details ?? {};
+    const intent = step('intent_parsing'), policy = step('policy_evaluation'), shield = step('intent_output_shield');
+    return { correlationId: sanitize(fl.correlation_id, 80), eventId: sanitize(fl.event_id, 80), finalOutcome: sanitize(fl.final_outcome, 40),
+      errorCode: sanitize(fl.error_code, 80), terminalStage: sanitize(fl.terminal_stage, 40), terminalReason: sanitize(fl.terminal_reason, 200),
+      intentVerdict: sanitize(intent.verdict, 40), intentCode: sanitize(intent.verdict_code, 80), intentConfidence: intent.confidence ?? null,
+      policyAllowed: policy.allowed ?? null, policyName: sanitize(policy.policy_name, 120),
+      answer: sanitize(j.__agntid_result?.answer ?? shield.candidate_answer, 120) };
+  }
+  return null;
+}
+
 // Raw Runtime call used only for probes; reports exactly what the Runtime returned.
 async function probe(caller: McpCaller, args: Record<string, unknown>) {
   try {
@@ -65,7 +84,11 @@ async function probe(caller: McpCaller, args: Record<string, unknown>) {
   }
 }
 
-export async function runScenario(caller: McpCaller, identity: { agentId: string; userId: string }, s: Scenario) {
+export async function runScenario(rawCaller: McpCaller, identity: { agentId: string; userId: string }, s: Scenario) {
+  let lastRaw: unknown = null;
+  const caller = { close: () => rawCaller.close(), callTool: async (name: string, args: Record<string, unknown>) => {
+    try { const r = await rawCaller.callTool(name, args); if (name === TOOL) lastRaw = r; return r; }
+    catch (e) { if (name === TOOL) lastRaw = e instanceof Error ? e.message : String(e); throw e; } } } as unknown as McpCaller;
   const agentId = s.agentOverride ?? identity.agentId;
   const out: Record<string, unknown> = { id: s.id, question: s.question, prompt: s.prompt, arguments: s.args, expected: s.expected };
   if (s.task === 'none' || s.task === 'forged') {
@@ -109,6 +132,7 @@ export async function runScenario(caller: McpCaller, identity: { agentId: string
   } finally {
     await runtime.closeTask().catch(() => undefined);
   }
+  if (out.agntid && typeof out.agntid === 'object') (out.agntid as Record<string, unknown>).flow = flowOf(lastRaw);
   return out;
 }
 

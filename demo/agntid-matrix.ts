@@ -32,10 +32,10 @@ async function main() {
     const json = JSON.stringify(run, null, 2) + '\n';
     if (out) { mkdirSync(out, { recursive: true }); writeFileSync(path.join(out, 'matrix.json'), json); }
     console.log(json);
-    console.log('\nSUMMARY  id | expected | AgentProof | AgntID outcome (code) | correlation');
+    console.log('\nSUMMARY  id | expected | AgentProof | AgntID outcome (code) | final/intent | answer | correlation');
     for (const r of results as Record<string, any>[]) {
       const d = r.agntid?.decision;
-      console.log(`${r.id} | ${r.expected} | ${r.agentproof?.decision ?? '-'} | ${r.error ? 'ERROR ' + r.error : (d ? `${d.outcome ?? d.error} (${d.code || d.reason || ''})` : (r.agntid?.isError ? 'error ' + r.agntid.result : 'no decision'))} | ${d?.correlationId ?? ''}`);
+      console.log(`${r.id} | ${r.expected} | ${r.agentproof?.decision ?? '-'} | ${r.error ? 'ERROR ' + r.error : (d ? `${d.outcome ?? d.error} (${d.code || d.reason || ''})` : (r.agntid?.isError ? 'error ' + r.agntid.result : 'no decision'))} | ${r.agntid?.flow?.finalOutcome ?? ''} ${r.agntid?.flow?.intentVerdict ? 'intent=' + r.agntid.flow.intentVerdict : ''} | ${r.agntid?.flow?.answer ?? ''} | ${r.agntid?.flow?.correlationId || d?.correlationId || ''}`);
     }
   } finally { await caller.close(); }
 }

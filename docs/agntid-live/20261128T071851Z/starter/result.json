@@ -1,0 +1,29 @@
+{
+  "kind": "LIVE AGNTID RUNTIME",
+  "discovery": {
+    "initialVulnerabilities": 17,
+    "proposals": 1,
+    "certificateDigests": [
+      "504114e16d87cf88649b40032e8964d74e6fb6743c507a68ebf42ac299d9f4de"
+    ],
+    "certificatesVerified": true,
+    "residual": 0,
+    "attackBefore": true,
+    "attackAfter": false,
+    "legitimateAfter": true,
+    "discoveryVerified": true
+  },
+  "agntid": {
+    "taskId": "1354d440-7405-4184-aff7-31b0c6850d94",
+    "intentSnapshot": "intent-59ad7a61bd7f7b7471d51d93",
+    "taskPrepared": true,
+    "relevantTool": true,
+    "localDecision": "ALLOW",
+    "localReasons": [],
+    "runtimeDecision": null,
+    "execution": "AUTHZ_UNAVAILABLE",
+    "sum33Observed": false,
+    "evidenceVerified": true,
+    "dashboardExported": true
+  }
+}

@@ -37,7 +37,12 @@ function extractJson(text: string): Record<string, unknown> | null {
 export function payloadOf(result: unknown): Record<string, unknown> | null {
   if (!result || typeof result !== 'object') return null;
   const r = result as ToolResult;
-  if (r.structuredContent && typeof r.structuredContent === 'object' && !Array.isArray(r.structuredContent)) return r.structuredContent as Record<string, unknown>;
+  if (r.structuredContent && typeof r.structuredContent === 'object' && !Array.isArray(r.structuredContent)) {
+    const sc = r.structuredContent as Record<string, unknown>;
+    // FastMCP wraps non-dict returns as {result: ...}; unwrap that single key.
+    const keys = Object.keys(sc);
+    return keys.length === 1 && keys[0] === 'result' && record(sc.result) ? sc.result as Record<string, unknown> : sc;
+  }
   for (const block of r.content ?? []) {
     const text = block && typeof block === 'object' ? (block as { text?: unknown }).text : undefined;
     if (typeof text === 'string') { const json = extractJson(text); if (json) return json; }
